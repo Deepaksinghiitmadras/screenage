@@ -39,14 +39,14 @@ export default function StockSentimentCard({ insight }: StockSentimentCardProps)
     }
 
     return (
-        <section className="rounded-2xl border border-gray-800 bg-gray-950/40 p-5 backdrop-blur-sm">
+        <section className="rounded-2xl border border-gray-700 bg-gray-800 p-5">
             <div className="flex flex-col gap-5">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
                             Sentiment Insights
                         </p>
-                        <h2 className="mt-2 text-xl font-semibold text-white">
+                        <h2 className="mt-2 text-xl font-semibold text-gray-100">
                             {insight.symbol} across social and public channels
                         </h2>
                         {insight.companyName ? (
@@ -59,12 +59,12 @@ export default function StockSentimentCard({ insight }: StockSentimentCardProps)
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 rounded-2xl border border-gray-800 bg-black/20 p-4 md:min-w-[320px]">
+                    <div className="grid grid-cols-2 gap-3 rounded-2xl border border-gray-700 bg-gray-900/40 p-4 md:min-w-[320px]">
                         <div>
                             <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gray-500">
                                 Avg. Buzz
                             </p>
-                            <p className="mt-1 text-lg font-semibold text-white">
+                            <p className="mt-1 text-lg font-semibold text-gray-100">
                                 {formatScore(insight.averageBuzz, '/100')}
                             </p>
                         </div>
@@ -72,7 +72,7 @@ export default function StockSentimentCard({ insight }: StockSentimentCardProps)
                             <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gray-500">
                                 Bullish Avg
                             </p>
-                            <p className="mt-1 text-lg font-semibold text-white">
+                            <p className="mt-1 text-lg font-semibold text-gray-100">
                                 {formatScore(insight.bullishAverage, '%')}
                             </p>
                         </div>
@@ -88,7 +88,7 @@ export default function StockSentimentCard({ insight }: StockSentimentCardProps)
                             <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gray-500">
                                 Coverage
                             </p>
-                            <p className="mt-1 text-lg font-semibold text-white">
+                            <p className="mt-1 text-lg font-semibold text-gray-100">
                                 {insight.availableSources}/4
                             </p>
                         </div>
@@ -99,41 +99,41 @@ export default function StockSentimentCard({ insight }: StockSentimentCardProps)
                     {insight.sources.map((source) => (
                         <article
                             key={source.source}
-                            className="rounded-xl border border-gray-800 bg-black/20 p-4"
+                            className="rounded-xl border border-gray-700 bg-gray-900/40 p-4"
                         >
                             <div className="flex items-center justify-between">
-                                <h3 className="text-base font-semibold text-white">{source.label}</h3>
+                                <h3 className="text-base font-semibold text-gray-100">{source.label}</h3>
                                 <span className={`text-sm font-medium capitalize ${getTrendClasses(source.trend)}`}>
                                     {source.trend ?? 'No trend'}
                                 </span>
                             </div>
 
                             <div className="mt-4 grid grid-cols-2 gap-3">
-                                <div className="rounded-lg border border-gray-800 bg-black/20 p-3">
+                                <div className="rounded-lg border border-gray-700 bg-gray-800/60 p-3">
                                     <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gray-500">
                                         Buzz
                                     </p>
-                                    <p className="mt-2 text-xl font-semibold text-white">
+                                    <p className="mt-2 text-xl font-semibold text-gray-100">
                                         {formatScore(source.buzzScore, '/100')}
                                     </p>
                                 </div>
-                                <div className="rounded-lg border border-gray-800 bg-black/20 p-3">
+                                <div className="rounded-lg border border-gray-700 bg-gray-800/60 p-3">
                                     <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gray-500">
                                         Bullish
                                     </p>
-                                    <p className="mt-2 text-xl font-semibold text-white">
+                                    <p className="mt-2 text-xl font-semibold text-gray-100">
                                         {formatScore(source.bullishPct, '%')}
                                     </p>
                                 </div>
-                                <div className="rounded-lg border border-gray-800 bg-black/20 p-3">
+                                <div className="rounded-lg border border-gray-700 bg-gray-800/60 p-3">
                                     <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gray-500">
                                         {source.metricLabel}
                                     </p>
-                                    <p className="mt-2 text-xl font-semibold text-white">
+                                    <p className="mt-2 text-xl font-semibold text-gray-100">
                                         {formatCompactNumber(source.metricValue)}
                                     </p>
                                 </div>
-                                <div className="rounded-lg border border-gray-800 bg-black/20 p-3">
+                                <div className="rounded-lg border border-gray-700 bg-gray-800/60 p-3">
                                     <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gray-500">
                                         Trend
                                     </p>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { memo, useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import useTradingViewWidget from "@/hooks/useTradingViewWidget";
 import { cn } from "@/lib/utils";
 import { Maximize2, Minimize2 } from 'lucide-react';
@@ -13,13 +14,17 @@ interface TradingViewWidgetProps {
     height?: number;
     className?: string;
     allowExpand?: boolean;
+    forceTheme?: 'light' | 'dark';
 }
 
-const TradingViewWidget = ({ title, scriptUrl, config, height = 600, className, allowExpand = false }: TradingViewWidgetProps) => {
+const TradingViewWidget = ({ title, scriptUrl, config, height = 600, className, allowExpand = false, forceTheme }: TradingViewWidgetProps) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [windowHeight, setWindowHeight] = useState(0);
+    const [mounted, setMounted] = useState(false);
+    const { resolvedTheme } = useTheme();
 
     useEffect(() => {
+        setMounted(true);
         if (typeof window !== 'undefined') {
             setWindowHeight(window.innerHeight);
             const handleResize = () => setWindowHeight(window.innerHeight);
@@ -30,8 +35,17 @@ const TradingViewWidget = ({ title, scriptUrl, config, height = 600, className, 
 
     const currentHeight = isExpanded ? windowHeight : height;
 
+    // Match the TradingView widget theme to the active app theme. We also force a
+    // transparent background and drop any hardcoded backgroundColor so the widget
+    // blends with the (theme-aware) page behind it instead of showing an inverted
+    // light/dark panel.
+    const isLight = forceTheme ? forceTheme === 'light' : mounted && resolvedTheme === 'light';
+    const { backgroundColor: _ignoredBg, ...restConfig } = config as Record<string, unknown>;
     const widgetConfig = {
-        ...config,
+        ...restConfig,
+        colorTheme: isLight ? 'light' : 'dark',
+        theme: isLight ? 'light' : 'dark',
+        isTransparent: true,
         height: currentHeight,
         width: "100%",
         autosize: true,

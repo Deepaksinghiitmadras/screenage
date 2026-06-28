@@ -19,52 +19,59 @@ export default function AlertsPanel({ alerts, onRefresh }: AlertsPanelProps) {
     };
 
     return (
-        <div className="bg-gray-900/30 rounded-lg border border-gray-800 p-4 h-full">
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-white flex items-center">
-                    <Bell className="w-5 h-5 mr-2 text-yellow-500" />
-                    Alerts
+        <div className="rounded-2xl border border-gray-700 bg-gray-800 p-4">
+            <div className="mb-4 flex items-center justify-between">
+                <h2 className="flex items-center text-sm font-semibold uppercase tracking-wider text-gray-300">
+                    <span className="mr-2 flex h-7 w-7 items-center justify-center rounded-lg bg-yellow-400/10 text-yellow-400 ring-1 ring-yellow-400/20">
+                        <Bell className="h-4 w-4" />
+                    </span>
+                    Price Alerts
                 </h2>
-                {/* <button className="text-sm text-yellow-500 hover:underline">Create Alert</button> */}
+                <span className="rounded-full bg-gray-700 px-2 py-0.5 text-xs text-gray-400">{alerts.length}</span>
             </div>
 
             <div className="space-y-3">
                 {alerts.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500 text-sm">
-                        No active alerts. Add one from the watchlist.
+                    <div className="rounded-xl border border-dashed border-gray-700 bg-gray-900/40 px-3 py-8 text-center">
+                        <Bell className="mx-auto mb-2 h-6 w-6 text-gray-600" />
+                        <p className="text-sm text-gray-500">No active alerts.</p>
+                        <p className="mt-1 text-xs text-gray-600">Tap the bell on any watchlist row to set one.</p>
                     </div>
                 ) : (
-                    alerts.map((alert) => (
-                        <div key={alert._id} className="bg-gray-800/40 rounded-lg p-3 border border-gray-800 relative group">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <div className="flex items-center space-x-2">
-                                        <div className="w-8 h-8 rounded bg-gray-700 flex items-center justify-center font-bold text-xs text-white">
-                                            {alert.symbol[0]}
+                    alerts.map((alert) => {
+                        const isAbove = String(alert.condition).toLowerCase().includes("above");
+                        return (
+                            <div key={alert._id} className="group relative rounded-xl border border-gray-700 bg-gray-900/40 p-3 transition-colors hover:border-gray-600">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-700 text-xs font-bold text-gray-100">
+                                                {alert.symbol[0]}
+                                            </div>
+                                            <div>
+                                                <div className="text-sm font-bold text-gray-100">{alert.symbol}</div>
+                                                <div className="text-xs text-gray-500">Target {formatCurrency(alert.targetPrice)}</div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <div className="font-bold text-white text-sm">{alert.symbol}</div>
-                                            <div className="text-xs text-gray-400">Target: {formatCurrency(alert.targetPrice)}</div>
+                                        <div className={`mt-2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ${isAbove ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                                            <TrendingUp className={`h-3 w-3 ${isAbove ? "" : "rotate-180"}`} />
+                                            Price {String(alert.condition).toLowerCase()} {formatCurrency(alert.targetPrice)}
+                                        </div>
+                                        <div className="mt-1 text-[10px] text-gray-600">
+                                            Active until {new Date(new Date(alert.createdAt).getTime() + 90 * 24 * 60 * 60 * 1000).toLocaleDateString()}
                                         </div>
                                     </div>
-                                    <div className="mt-2 text-xs text-yellow-500 font-medium">
-                                        Condition: Price {alert.condition.toLowerCase()} {formatCurrency(alert.targetPrice)}
-                                    </div>
-                                    <div className="text-[10px] text-gray-500 mt-1">
-                                        Active until {new Date(new Date(alert.createdAt).getTime() + 90 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                                    </div>
-                                </div>
-                                <div className="flex flex-col space-y-2">
                                     <button
                                         onClick={() => handleDelete(alert._id)}
-                                        className="text-gray-500 hover:text-red-500 transition-colors p-1"
+                                        className="rounded p-1 text-gray-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                                        title="Delete alert"
                                     >
-                                        <Trash2 className="w-4 h-4" />
+                                        <Trash2 className="h-4 w-4" />
                                     </button>
                                 </div>
                             </div>
-                        </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
         </div>

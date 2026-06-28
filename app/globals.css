@@ -132,6 +132,44 @@
     --color-purple-500: #D13BFF;
 }
 
+/* === LIGHT THEME ===
+   Re-maps the gray scale so dark surfaces become light surfaces and light
+   text becomes dark text. Accent colors (teal/red/etc.) are kept. */
+html.light {
+    --background: #f6f7f9;
+    --foreground: #0b0f14;
+
+    /* Surfaces (high numbers) -> light */
+    --color-gray-900: #f6f7f9; /* page background */
+    --color-gray-800: #ffffff; /* cards / elevated panels */
+    --color-gray-700: #e3e6ea; /* borders */
+    --color-gray-600: #cbd2da; /* stronger borders / dividers */
+
+    /* Mid tones stay readable */
+    --color-gray-500: #6b7280; /* muted text */
+    --color-gray-400: #4b5563; /* secondary text */
+
+    /* Text (low numbers) -> dark */
+    --color-gray-300: #374151;
+    --color-gray-200: #1f2937;
+    --color-gray-100: #0b0f14; /* primary text */
+    --color-gray-50: #0b0f14;
+}
+
+html.light body {
+    @apply bg-gray-900 text-gray-100;
+}
+
+/* `text-white` is used for headings on dark cards; flip to dark text in light
+   mode. The footer is an intentionally dark band, so keep its text white. */
+html.light :where(.text-white) {
+    color: #0b0f14;
+}
+html.light footer.text-white,
+html.light footer :where(.text-white) {
+    color: #ffffff;
+}
+
 @layer base {
     * {
         @apply border-border outline-ring/50;
@@ -154,6 +192,29 @@
     .home-section {
         @apply w-full gap-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3;
     }
+    .indices-ticker {
+        @apply w-full overflow-hidden bg-gray-800 border border-gray-700 rounded-md py-2;
+    }
+    .indices-ticker-track {
+        @apply flex w-max gap-10 whitespace-nowrap;
+        animation: indices-marquee 40s linear infinite;
+    }
+    .indices-ticker:hover .indices-ticker-track {
+        animation-play-state: paused;
+    }
+    .indices-ticker-item {
+        @apply flex items-center gap-2 text-sm px-2;
+    }
+    @keyframes indices-marquee {
+        from { transform: translateX(0); }
+        to { transform: translateX(-50%); }
+    }
+    .movers-table {
+        @apply w-full bg-gray-900 border border-gray-800 rounded-lg overflow-hidden;
+    }
+    .movers-table-title {
+        @apply px-4 py-3 text-base font-semibold text-gray-100 border-b border-gray-800 bg-gray-800/50;
+    }
     .header {
         @apply z-50 w-full h-[70px] bg-gray-800;
     }
@@ -167,7 +228,7 @@
         @apply pt-6 lg:pt-8 mb-8 lg:mb-12;
     }
     .auth-left-section {
-        @apply w-full lg:w-[45%] lg:h-screen px-6 lg:px-16 flex flex-col overflow-y-auto;
+        @apply w-full lg:max-w-2xl mx-auto lg:h-screen px-6 lg:px-16 flex flex-col overflow-y-auto;
     }
     .auth-right-section {
         @apply w-full max-lg:border-t max-lg:border-gray-600 lg:w-[55%] lg:h-screen bg-gray-800 px-6 py-4 md:p-6 lg:py-12 lg:px-18 flex flex-col justify-start;
@@ -210,6 +271,12 @@
     }
     .search-text {
         @apply cursor-pointer hover:text-teal-500;
+    }
+    .search-box {
+        @apply cursor-text flex items-center gap-2 w-full sm:w-72 lg:w-96 px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-500 hover:border-teal-500 transition-colors;
+    }
+    .search-box-placeholder {
+        @apply text-sm text-gray-500 truncate;
     }
     .search-btn {
         @apply cursor-pointer px-4 py-2 w-fit flex items-center gap-2 text-sm md:text-base bg-teal-500 hover:bg-teal-500 text-black font-medium rounded;
@@ -391,30 +458,30 @@
 /* TradingView Advanced Chart Widget Styles */
 .tradingview-widget-container {
     position: relative;
-    background-color: #141414 !important;
+    background-color: transparent !important;
     border-radius: 8px !important;
     overflow: hidden !important;
 }
 
 .tv-embed-widget-wrapper__body {
-    background-color: #141414 !important;
+    background-color: transparent !important;
 }
 
 .tradingview-widget-container__widget {
-    background-color: #141414 !important;
+    background-color: transparent !important;
     height: 100% !important;
 
 }
 
 .widget-stock-heatmap-container .screenerMapWrapper-BBVfGP0b {
     overflow: hidden !important;
-    background: #141414 !important;
-    background-color: #141414 !important;
+    background: transparent !important;
+    background-color: transparent !important;
 }
 
 .canvasContainer-tyaAU8aH {
-    background: #141414 !important;
-    background-color: #141414 !important;
+    background: transparent !important;
+    background-color: transparent !important;
 }
 
 .tv-site-widget--bg_none {
@@ -422,31 +489,20 @@
 }
 
 .tradingview-widget-copyright {
-    font-size: 11px;
-    color: #9ca3af;
-    text-align: center;
-    padding: 4px 0;
-    background-color: transparent;
+    display: none !important;
 }
 
 .tradingview-widget-copyright a {
-    color: #60a5fa;
-    text-decoration: none;
-    transition: color 0.2s ease;
-}
-
-.tradingview-widget-copyright a:hover {
-    color: #93c5fd;
-    text-decoration: underline;
+    display: none !important;
 }
 
 .tv-embed-widget-wrapper .tv-embed-widget-wrapper__body {
-    background: #141414 !important;
-    background-color: #141414 !important;
+    background: transparent !important;
+    background-color: transparent !important;
 }
 
 .tradingview-widget-container iframe {
-    background-color: #141414 !important;
+    background-color: transparent !important;
     width: 100% !important;
 }
 

@@ -1,15 +1,16 @@
 /**
- * AI Provider abstraction for OpenStock.
+ * AI Provider abstraction for Screenage.
  *
  * Supports multiple LLM backends via the AI_PROVIDER environment variable:
  *   - "gemini"  (default) – Google Gemini REST API
+ *   - "groq"    – Groq (OpenAI-compatible, very fast Llama models)
  *   - "minimax" – MiniMax (OpenAI-compatible)
  *   - "siray"   – Siray.ai (OpenAI-compatible)
  *
  * Each provider returns a plain-text string from the model.
  */
 
-export type AIProviderName = "gemini" | "minimax" | "siray";
+export type AIProviderName = "gemini" | "groq" | "minimax" | "siray";
 
 export interface AIProviderConfig {
   name: AIProviderName;
@@ -30,6 +31,14 @@ export function getProviderConfig(
     "gemini";
 
   switch (name) {
+    case "groq":
+      return {
+        name: "groq",
+        apiKey: process.env.GROQ_API_KEY || "",
+        baseUrl: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
+        model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+      };
+
     case "minimax":
       return {
         name: "minimax",
@@ -60,19 +69,41 @@ export function getProviderConfig(
 }
 
 /**
- * Get the fallback provider: if the primary is Gemini use MiniMax,
- * otherwise fall back to Gemini.
+ * Whether a provider has its API key configured.
  */
-export function getFallbackProviderName(
-  primary: AIProviderName
-): AIProviderName {
-  if (primary === "gemini") {
-    // Prefer MiniMax as fallback when a key is available, else Siray
-    if (process.env.MINIMAX_API_KEY) return "minimax";
-    if (process.env.SIRAY_API_KEY) return "siray";
-    return "minimax"; // caller will see missing-key error
+export function hasProviderKey(name: AIProviderName): boolean {
+  switch (name) {
+    case "gemini":
+      return !!process.env.GEMINI_API_KEY;
+    case "groq":
+      return !!process.env.GROQ_API_KEY;
+    case "minimax":
+      return !!process.env.MINIMAX_API_KEY;
+    case "siray":
+      return !!process.env.SIRAY_API_KEY;
+    default:
+      return false;
   }
-  return "gemini";
+}
+
+/**
+ * Build the ordered list of providers to try: the configured primary first,
+ * then the remaining providers that have keys. Providers without keys are
+ * skipped so we never throw a missing-key error mid-chain.
+ */
+export function getProviderChain(): AIProviderName[] {
+  const primary =
+    (process.env.AI_PROVIDER as AIProviderName) || "groq";
+  // Preferred order: Groq first (fast + cheap), then Gemini, then others.
+  const order: AIProviderName[] = [primary, "groq", "gemini", "minimax", "siray"];
+  const chain: AIProviderName[] = [];
+  const seen = new Set<AIProviderName>();
+  for (const p of order) {
+    if (seen.has(p)) continue;
+    seen.add(p);
+    if (hasProviderKey(p)) chain.push(p);
+  }
+  return chain;
 }
 
 // ── Provider call implementations ──────────────────────────────────
@@ -162,23 +193,36 @@ export async function callAIProvider(
 }
 
 /**
- * Call the AI provider with automatic fallback.
- * Tries the primary provider first; on failure switches to the fallback.
+ * Call the AI provider with automatic fallback across all configured providers.
+ * Tries each provider in the chain until one succeeds.
  */
 export async function callAIProviderWithFallback(
   prompt: string
 ): Promise<string> {
-  const primaryName =
-    (process.env.AI_PROVIDER as AIProviderName) || "gemini";
-  const fallbackName = getFallbackProviderName(primaryName);
-
-  try {
-    return await callAIProvider(prompt, primaryName);
-  } catch (primaryError) {
-    console.error(
-      `⚠️ ${primaryName} failed, switching to ${fallbackName} fallback`,
-      primaryError
+  const chain = getProviderChain();
+  if (chain.length === 0) {
+    throw new Error(
+      "No AI provider configured. Set GEMINI_API_KEY, GROQ_API_KEY, MINIMAX_API_KEY or SIRAY_API_KEY."
     );
-    return await callAIProvider(prompt, fallbackName);
   }
+
+  let lastError: unknown;
+  for (let i = 0; i < chain.length; i++) {
+    const name = chain[i];
+    try {
+      return await callAIProvider(prompt, name);
+    } catch (err) {
+      lastError = err;
+      const next = chain[i + 1];
+      console.error(
+        next
+          ? `⚠️ ${name} failed, switching to ${next} fallback`
+          : `⚠️ ${name} failed (no more fallbacks)`,
+        err
+      );
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("All AI providers failed");
 }

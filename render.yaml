@@ -1,0 +1,15 @@
+# Render Blueprint — deploys the Python market-data microservice.
+# Docs: https://render.com/docs/blueprint-spec
+# After pushing, go to Render → New → Blueprint and point it at this repo.
+services:
+  - type: web
+    name: screenage-market-service
+    runtime: python
+    rootDir: market-service
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8

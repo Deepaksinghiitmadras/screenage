@@ -223,11 +223,11 @@ export function formatSymbolForTradingView(symbol: string): string {
 
     for (const suffix of suffixes) {
         if (upperSymbol.endsWith(suffix.toUpperCase())) {
-            const ticker = upperSymbol.slice(0, -suffix.length);
+            const ticker = upperSymbol.slice(0, -suffix.length).replace(/&/g, '_');
             const exchange = FINNHUB_TO_TRADINGVIEW_EXCHANGE[suffix];
             return `${exchange}:${ticker}`;
         }
     }
 
-    return upperSymbol;
+    return upperSymbol.replace(/&/g, '_');
 }

@@ -1,8 +1,9 @@
 export const NAV_ITEMS = [
     { href: '/', label: 'Dashboard' },
     { href: '/search', label: 'Search' },
+    { href: '/screener', label: 'Screener' },
+    { href: '/options', label: 'Options' },
     { href: '/watchlist', label: 'Watchlist' },
-    { href: '/api-docs', label: 'API Docs' },
 ];
 
 // Sign-up form select options
@@ -111,6 +112,16 @@ export const HEATMAP_WIDGET_CONFIG = {
     isZoomEnabled: true,
     hasSymbolTooltip: true,
     isMonoSize: false,
+    width: '100%',
+    height: '600',
+};
+
+export const CALENDAR_WIDGET_CONFIG = {
+    colorTheme: 'dark',
+    isTransparent: true,
+    locale: 'en',
+    countryFilter: 'in,us,gb,eu,cn,jp',
+    importanceFilter: '-1,0,1',
     width: '100%',
     height: '600',
 };

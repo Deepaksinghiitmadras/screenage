@@ -1,7 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import NavItems from "@/components/NavItems";
 import UserDropdown from "@/components/UserDropdown";
+import ThemeToggle from "@/components/ThemeToggle";
 import {searchStocks} from "@/lib/actions/finnhub.actions";
 
 const Header = async ({ user }: { user: User }) => {
@@ -11,18 +11,16 @@ const Header = async ({ user }: { user: User }) => {
         <header className="sticky top-0 header">
             <div className="container header-wrapper">
                 <Link href="/" className="flex items-center justify-center gap-2">
-                    <Image
-                        src="/assets/images/logo.png"
-                        alt="OpenStock"
-                        width={200}
-                        height={50}
-                    />
+                    <span className="text-2xl font-bold text-gray-100">Screenage</span>
                 </Link>
                 <nav className="hidden sm:block">
                     <NavItems initialStocks={initialStocks}/>
                 </nav>
 
-                <UserDropdown user={user} initialStocks={initialStocks} />
+                <div className="flex items-center gap-3">
+                    <ThemeToggle />
+                    <UserDropdown user={user} initialStocks={initialStocks} />
+                </div>
             </div>
         </header>
     )

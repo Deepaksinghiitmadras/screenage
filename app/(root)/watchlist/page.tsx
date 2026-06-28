@@ -9,7 +9,7 @@ import WatchlistManager from '@/components/watchlist/WatchlistManager';
 import AlertsPanel from '@/components/watchlist/AlertsPanel';
 import NewsGrid from '@/components/watchlist/NewsGrid';
 import SearchCommand from '@/components/SearchCommand';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye } from 'lucide-react';
 
 export default async function WatchlistPage() {
     const session = await auth.api.getSession({
@@ -35,36 +35,42 @@ export default async function WatchlistPage() {
     const relevantNews = watchlistSymbols.length > 0 ? await getNews(watchlistSymbols) : news;
 
     return (
-        <div className="min-h-screen bg-black text-gray-100 p-6 md:p-8">
+        <div className="min-h-screen bg-gray-900 text-gray-100 p-5 md:p-8">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-500">
-                        Watchlist
-                    </h1>
-                    <p className="text-gray-500 mt-1">Track your favorite stocks and manage alerts.</p>
+            <div className="mb-8 flex flex-col gap-4 rounded-2xl border border-gray-700 bg-gradient-to-br from-gray-800 to-gray-900 p-6 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-start gap-3">
+                    <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-400/10 text-teal-400 ring-1 ring-teal-400/20">
+                        <Eye className="h-5 w-5" />
+                    </span>
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-100 md:text-3xl">Watchlist</h1>
+                        <p className="mt-1 text-sm text-gray-500">
+                            Track your stocks, set price alerts and follow the news that moves them.
+                        </p>
+                    </div>
                 </div>
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center gap-3">
+                    <span className="hidden rounded-full border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs text-gray-400 sm:inline-flex">
+                        {watchlistSymbols.length} tracked · {alerts.length} alerts
+                    </span>
                     <SearchCommand renderAs="button" label="Add Stock" initialStocks={[]} />
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
                 {/* Main Content - Watchlist Table */}
-                <div className="lg:col-span-3 space-y-8">
-                    <div className="space-y-6">
-                        <WatchlistManager initialItems={watchlistItems} userId={userId} />
-                    </div>
+                <div className="space-y-6 lg:col-span-2 xl:col-span-3">
+                    <WatchlistManager initialItems={watchlistItems} userId={userId} />
+                </div>
+
+                {/* Sidebar - Alerts + News */}
+                <div className="space-y-6 lg:col-span-1">
+                    <AlertsPanel alerts={alerts} />
 
                     {/* News Section */}
                     <Suspense fallback={<div className="flex justify-center p-12"><Loader2 className="animate-spin text-gray-500" /></div>}>
-                        <NewsGrid news={relevantNews || []} />
+                        <NewsGrid news={relevantNews || []} compact />
                     </Suspense>
-                </div>
-
-                {/* Sidebar - Alerts */}
-                <div className="lg:col-span-1">
-                    <AlertsPanel alerts={alerts} />
                 </div>
             </div>
         </div>

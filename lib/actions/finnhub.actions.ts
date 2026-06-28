@@ -123,7 +123,10 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
         }
         const cleanSymbols = (symbols || [])
             .map((s) => s?.trim().toUpperCase())
-            .filter((s): s is string => Boolean(s));
+            .filter((s): s is string => Boolean(s))
+            // Finnhub's free tier returns 403 for Indian (.NS/.BO) tickers on
+            // company-news, so skip them and use general market news instead.
+            .filter((s) => !/\.(NS|BO)$/.test(s));
 
         const maxArticles = 6;
 
@@ -138,7 +141,7 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
                         const articles = await fetchJSON<RawNewsArticle[]>(url, 300);
                         perSymbolArticles[sym] = (articles || []).filter(validateArticle);
                     } catch (e) {
-                        console.error('Error fetching company news for', sym, e);
+                        console.warn('Skipping company news for', sym, e instanceof Error ? e.message : e);
                         perSymbolArticles[sym] = [];
                     }
                 })

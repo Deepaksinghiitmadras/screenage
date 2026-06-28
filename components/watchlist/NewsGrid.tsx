@@ -7,38 +7,48 @@ import { ExternalLink } from "lucide-react";
 
 interface NewsGridProps {
     news: any[];
+    compact?: boolean;
 }
 
-export default function NewsGrid({ news }: NewsGridProps) {
+export default function NewsGrid({ news, compact = false }: NewsGridProps) {
     if (!news || news.length === 0) return null;
 
     return (
-        <div className="mt-8">
-            <h2 className="text-xl font-bold text-white mb-4">Market News</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="mt-2">
+            <div className="mb-4 flex items-center gap-2">
+                <span className="h-4 w-1 rounded-full bg-teal-400" />
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-300">Market News</h2>
+            </div>
+            <div
+                className={
+                    compact
+                        ? "grid grid-cols-1 gap-4"
+                        : "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+                }
+            >
                 {news.map((item, idx) => (
                     <a
                         key={idx}
                         href={item.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block bg-gray-900/30 border border-gray-800 rounded-lg overflow-hidden hover:border-gray-700 transition-colors group"
+                        className="group block overflow-hidden rounded-xl border border-gray-700 bg-gray-800 transition-colors hover:border-teal-400/40"
                     >
-                        <div className="p-4 flex flex-col h-full">
-                            <div className="flex items-start justify-between mb-2">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${item.related ? "bg-blue-900/50 text-blue-300" : "bg-gray-800 text-gray-400"
+                        <div className="flex h-full flex-col p-4">
+                            <div className="mb-2 flex items-start justify-between">
+                                <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${item.related ? "bg-blue-500/15 text-blue-400" : "bg-gray-700 text-gray-400"
                                     }`}>
                                     {item.related || "MARKET"}
                                 </span>
-                                <ExternalLink className="w-3 h-3 text-gray-600 group-hover:text-gray-400" />
+                                <ExternalLink className="h-3 w-3 text-gray-600 group-hover:text-teal-400" />
                             </div>
-                            <h3 className="text-sm font-semibold text-gray-200 mb-2 line-clamp-2 group-hover:text-blue-400 transition-colors">
+                            <h3 className="mb-2 line-clamp-2 text-sm font-semibold text-gray-100 transition-colors group-hover:text-teal-400">
                                 {item.headline}
                             </h3>
-                            <p className="text-xs text-gray-500 line-clamp-3 mb-4 flex-1">
+                            <p className="mb-4 line-clamp-3 flex-1 text-xs text-gray-500">
                                 {item.summary}
                             </p>
-                            <div className="flex items-center justify-between text-[10px] text-gray-600 mt-auto">
+                            <div className="mt-auto flex items-center justify-between text-[10px] text-gray-600">
                                 <span>{item.source}</span>
                                 <span>
                                     {item.datetime ? formatDistanceToNow(item.datetime * 1000, { addSuffix: true }) : ''}

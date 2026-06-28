@@ -25,7 +25,7 @@ export const sendPasswordResetEmail = async (
                     <h1 style="margin:0 0 16px;font-size:28px;">Reset your password</h1>
                     <p style="margin:0 0 16px;color:#d4d4d8;">Hi ${escapedFirstName},</p>
                     <p style="margin:0 0 24px;color:#d4d4d8;line-height:1.6;">
-                        We received a request to reset your Openstock password. Use the button below to choose a new one.
+                        We received a request to reset your Screenage password. Use the button below to choose a new one.
                     </p>
                     <a
                         href="${escapedResetUrl}"
@@ -41,9 +41,9 @@ export const sendPasswordResetEmail = async (
         `;
 
         const info = await transporter.sendMail({
-            from: `"Openstock" <${process.env.NODEMAILER_EMAIL}>`,
+            from: `"Screenage" <${process.env.NODEMAILER_EMAIL}>`,
             to: email,
-            subject: 'Reset your Openstock password',
+            subject: 'Reset your Screenage password',
             text: `Reset your password: ${encodeURI(resetUrl)}`,
             html,
         });
