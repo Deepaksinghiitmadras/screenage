@@ -28,7 +28,7 @@
     "d3-geo": "^3.1.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
-    "inngest": "^3.47.0",
+    "inngest": "^4.11.0",
     "klinecharts": "^9.8.10",
     "lightweight-charts": "^5.2.0",
     "lucide-react": "^0.544.0",
