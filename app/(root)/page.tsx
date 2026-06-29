@@ -7,6 +7,8 @@ import MarketHeatmap from "@/components/market/MarketHeatmap";
 import EconomicCalendar from "@/components/market/EconomicCalendar";
 import { getMovers, getHeatmap } from "@/lib/actions/market.actions";
 
+export const dynamic = "force-dynamic";
+
 const Home = async () => {
     const [movers, heatmap] = await Promise.all([getMovers(), getHeatmap()]);
 
