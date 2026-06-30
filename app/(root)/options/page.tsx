@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Layers, Loader2, Search, TrendingUp, Target, Scale } from "lucide-react";
+import { Layers, Loader2, Search, TrendingUp, Target, Scale, RefreshCw, Shield, Ban } from "lucide-react";
 import { getOptionChain } from "@/lib/actions/options.actions";
-import { OIDistributionChart, IVSmileChart } from "@/components/options/OptionCharts";
+import { OIDistributionChart, IVSmileChart, MaxPainChart } from "@/components/options/OptionCharts";
 
 const PRESETS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "RELIANCE", "TCS", "HDFCBANK", "INFY", "TATASTEEL"];
 
@@ -15,6 +15,23 @@ const compact = (v: number): string => {
 };
 const fmt = (v: number | null, d = 2): string =>
     v === null || v === undefined || Number.isNaN(v) ? "—" : v.toFixed(d);
+
+const BUILDUP_META: Record<OptionBuildup, { label: string; title: string; cls: string }> = {
+    long_buildup: { label: "LB", title: "Long buildup — price ↑, OI ↑", cls: "bg-green-500/15 text-green-300" },
+    short_buildup: { label: "SB", title: "Short buildup — price ↓, OI ↑", cls: "bg-red-500/15 text-red-300" },
+    short_covering: { label: "SC", title: "Short covering — price ↑, OI ↓", cls: "bg-teal-500/15 text-teal-300" },
+    long_unwinding: { label: "LU", title: "Long unwinding — price ↓, OI ↓", cls: "bg-amber-500/15 text-amber-300" },
+    neutral: { label: "—", title: "No clear buildup", cls: "bg-gray-700/40 text-gray-500" },
+};
+
+function BuildupChip({ value }: { value?: OptionBuildup }) {
+    const meta = BUILDUP_META[value ?? "neutral"];
+    return (
+        <span title={meta.title} className={`inline-block rounded px-1 py-0.5 text-[10px] font-semibold ${meta.cls}`}>
+            {meta.label}
+        </span>
+    );
+}
 
 function SummaryCard({ icon, label, value, sub, tone }: { icon: React.ReactNode; label: string; value: string; sub?: string; tone?: string }) {
     return (
@@ -31,20 +48,30 @@ export default function OptionsPage() {
     const [input, setInput] = useState("NIFTY");
     const [expiry, setExpiry] = useState<string | undefined>(undefined);
     const [data, setData] = useState<OptionChainData | null>(null);
+    const [tableView, setTableView] = useState<"oi" | "greeks">("oi");
+    const [strikeCount, setStrikeCount] = useState(15);
+    const [autoRefresh, setAutoRefresh] = useState(false);
     const [isPending, startTransition] = useTransition();
 
-    const load = (sym: string, exp?: string) => {
+    const load = (sym: string, exp?: string, count = strikeCount) => {
         startTransition(async () => {
-            const res = await getOptionChain(sym, exp);
+            const res = await getOptionChain(sym, exp, count);
             setData(res);
             if (res.available && !exp) setExpiry(res.expiry);
         });
     };
 
     useEffect(() => {
-        load(symbol, expiry);
+        load(symbol, expiry, strikeCount);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [symbol, expiry]);
+    }, [symbol, expiry, strikeCount]);
+
+    useEffect(() => {
+        if (!autoRefresh) return;
+        const id = setInterval(() => load(symbol, expiry, strikeCount), 30000);
+        return () => clearInterval(id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoRefresh, symbol, expiry, strikeCount]);
 
     const selectSymbol = (s: string) => {
         const next = s.trim().toUpperCase();
@@ -96,6 +123,27 @@ export default function OptionsPage() {
                         ))}
                     </select>
                 )}
+                <select
+                    value={strikeCount}
+                    onChange={(e) => setStrikeCount(Number(e.target.value))}
+                    title="Strikes shown on each side of ATM"
+                    className="rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2.5 text-sm text-gray-100 focus:outline-none"
+                >
+                    {[5, 10, 15, 20, 30].map((n) => (
+                        <option key={n} value={n}>±{n} strikes</option>
+                    ))}
+                </select>
+                <button
+                    type="button"
+                    onClick={() => setAutoRefresh((v) => !v)}
+                    title="Auto-refresh every 30s"
+                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                        autoRefresh ? "border-teal-500/50 bg-teal-500/15 text-teal-300" : "border-gray-700 bg-gray-800/60 text-gray-300 hover:text-teal-300"
+                    }`}
+                >
+                    <RefreshCw className={`h-4 w-4 ${autoRefresh ? "animate-spin" : ""}`} style={autoRefresh ? { animationDuration: "3s" } : undefined} />
+                    {autoRefresh ? "Live" : "Auto"}
+                </button>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -136,6 +184,13 @@ export default function OptionsPage() {
                         <SummaryCard icon={<Layers className="h-3.5 w-3.5" />} label="Total Put OI" value={compact(data.totalPeOi)} tone="text-green-300" />
                     </div>
 
+                    {/* Key levels from OI walls */}
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <SummaryCard icon={<Shield className="h-3.5 w-3.5" />} label="Support (max Put OI)" value={data.support != null ? `${data.support}` : "—"} sub="put wall" tone="text-green-300" />
+                        <SummaryCard icon={<Ban className="h-3.5 w-3.5" />} label="Resistance (max Call OI)" value={data.resistance != null ? `${data.resistance}` : "—"} sub="call wall" tone="text-red-300" />
+                        <SummaryCard icon={<Scale className="h-3.5 w-3.5" />} label="ATM Straddle" value={data.atmStraddle != null ? `₹${fmt(data.atmStraddle)}` : "—"} sub="expected move (±)" tone="text-teal-300" />
+                    </div>
+
                     {/* Charts */}
                     <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                         <div className="rounded-lg border border-gray-700/60 bg-gray-800/40 p-4">
@@ -146,55 +201,130 @@ export default function OptionsPage() {
                             <h3 className="mb-2 text-sm font-semibold text-gray-200">IV Smile</h3>
                             <IVSmileChart strikes={data.strikes} atmStrike={data.atmStrike} />
                         </div>
+                        <div className="rounded-lg border border-gray-700/60 bg-gray-800/40 p-4 xl:col-span-2">
+                            <h3 className="mb-2 text-sm font-semibold text-gray-200">Max Pain — option-writer loss by strike</h3>
+                            <MaxPainChart curve={data.maxPainCurve ?? []} maxPain={data.maxPain} underlying={data.underlying} />
+                        </div>
                     </div>
 
                     {/* Option chain table */}
                     <div className="rounded-lg border border-gray-700/60 bg-gray-800/40 p-4">
-                        <h3 className="mb-3 text-sm font-semibold text-gray-200">Option Chain · {data.expiry}</h3>
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="text-sm font-semibold text-gray-200">
+                                Option Chain · {data.expiry}
+                                {data.daysToExpiry != null && (
+                                    <span className="ml-2 text-xs font-normal text-gray-500">{data.daysToExpiry}d to expiry</span>
+                                )}
+                            </h3>
+                            <div className="flex rounded-lg border border-gray-700 bg-gray-900/60 p-0.5 text-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => setTableView("oi")}
+                                    className={`rounded-md px-3 py-1 transition-colors ${tableView === "oi" ? "bg-teal-500/20 text-teal-300" : "text-gray-400 hover:text-gray-200"}`}
+                                >
+                                    Open Interest
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setTableView("greeks")}
+                                    className={`rounded-md px-3 py-1 transition-colors ${tableView === "greeks" ? "bg-teal-500/20 text-teal-300" : "text-gray-400 hover:text-gray-200"}`}
+                                >
+                                    Greeks
+                                </button>
+                            </div>
+                        </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[760px] border-collapse text-xs">
-                                <thead>
-                                    <tr className="border-b border-gray-700 text-gray-500">
-                                        <th colSpan={4} className="bg-red-500/5 py-1.5 text-center font-medium text-red-300">CALLS</th>
-                                        <th className="py-1.5 text-center font-medium text-gray-400">STRIKE</th>
-                                        <th colSpan={4} className="bg-green-500/5 py-1.5 text-center font-medium text-green-300">PUTS</th>
-                                    </tr>
-                                    <tr className="border-b border-gray-700 text-[11px] uppercase tracking-wide text-gray-500">
-                                        <th className="px-2 py-1.5 text-right font-medium">OI</th>
-                                        <th className="px-2 py-1.5 text-right font-medium">Chg OI</th>
-                                        <th className="px-2 py-1.5 text-right font-medium">IV</th>
-                                        <th className="px-2 py-1.5 text-right font-medium">LTP</th>
-                                        <th className="px-2 py-1.5 text-center font-medium text-gray-300">Strike</th>
-                                        <th className="px-2 py-1.5 text-right font-medium">LTP</th>
-                                        <th className="px-2 py-1.5 text-right font-medium">IV</th>
-                                        <th className="px-2 py-1.5 text-right font-medium">Chg OI</th>
-                                        <th className="px-2 py-1.5 text-right font-medium">OI</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {data.strikes.map((s) => {
-                                        const isAtm = s.strike === data.atmStrike;
-                                        const itmCall = data.underlying != null && s.strike < data.underlying;
-                                        const itmPut = data.underlying != null && s.strike > data.underlying;
-                                        return (
-                                            <tr key={s.strike} className={`border-b border-gray-800/70 ${isAtm ? "bg-teal-500/10" : "hover:bg-gray-800/40"}`}>
-                                                <td className={`px-2 py-1.5 text-right tabular-nums ${itmCall ? "bg-red-500/5" : ""} text-gray-300`}>{compact(s.ce.oi)}</td>
-                                                <td className={`px-2 py-1.5 text-right tabular-nums ${s.ce.changeOi >= 0 ? "text-green-400" : "text-red-400"}`}>{compact(s.ce.changeOi)}</td>
-                                                <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{fmt(s.ce.iv, 1)}</td>
-                                                <td className="px-2 py-1.5 text-right tabular-nums text-gray-300">{fmt(s.ce.ltp)}</td>
-                                                <td className={`px-2 py-1.5 text-center font-semibold tabular-nums ${isAtm ? "text-teal-300" : "text-gray-200"}`}>{s.strike}</td>
-                                                <td className="px-2 py-1.5 text-right tabular-nums text-gray-300">{fmt(s.pe.ltp)}</td>
-                                                <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{fmt(s.pe.iv, 1)}</td>
-                                                <td className={`px-2 py-1.5 text-right tabular-nums ${s.pe.changeOi >= 0 ? "text-green-400" : "text-red-400"}`}>{compact(s.pe.changeOi)}</td>
-                                                <td className={`px-2 py-1.5 text-right tabular-nums ${itmPut ? "bg-green-500/5" : ""} text-gray-300`}>{compact(s.pe.oi)}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                            {tableView === "oi" ? (
+                                <table className="w-full min-w-[820px] border-collapse text-xs">
+                                    <thead>
+                                        <tr className="border-b border-gray-700 text-gray-500">
+                                            <th colSpan={5} className="bg-red-500/5 py-1.5 text-center font-medium text-red-300">CALLS</th>
+                                            <th className="py-1.5 text-center font-medium text-gray-400">STRIKE</th>
+                                            <th colSpan={5} className="bg-green-500/5 py-1.5 text-center font-medium text-green-300">PUTS</th>
+                                        </tr>
+                                        <tr className="border-b border-gray-700 text-[11px] uppercase tracking-wide text-gray-500">
+                                            <th className="px-2 py-1.5 text-right font-medium">OI</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">Chg OI</th>
+                                            <th className="px-2 py-1.5 text-center font-medium">Bias</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">IV</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">LTP</th>
+                                            <th className="px-2 py-1.5 text-center font-medium text-gray-300">Strike</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">LTP</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">IV</th>
+                                            <th className="px-2 py-1.5 text-center font-medium">Bias</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">Chg OI</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">OI</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {data.strikes.map((s) => {
+                                            const isAtm = s.strike === data.atmStrike;
+                                            const itmCall = data.underlying != null && s.strike < data.underlying;
+                                            const itmPut = data.underlying != null && s.strike > data.underlying;
+                                            return (
+                                                <tr key={s.strike} className={`border-b border-gray-800/70 ${isAtm ? "bg-teal-500/10" : "hover:bg-gray-800/40"}`}>
+                                                    <td className={`px-2 py-1.5 text-right tabular-nums ${itmCall ? "bg-red-500/5" : ""} text-gray-300`}>{compact(s.ce.oi)}</td>
+                                                    <td className={`px-2 py-1.5 text-right tabular-nums ${s.ce.changeOi >= 0 ? "text-green-400" : "text-red-400"}`}>{compact(s.ce.changeOi)}</td>
+                                                    <td className="px-2 py-1.5 text-center"><BuildupChip value={s.ce.buildup} /></td>
+                                                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{fmt(s.ce.iv, 1)}</td>
+                                                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-300">{fmt(s.ce.ltp)}</td>
+                                                    <td className={`px-2 py-1.5 text-center font-semibold tabular-nums ${isAtm ? "text-teal-300" : "text-gray-200"}`}>{s.strike}</td>
+                                                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-300">{fmt(s.pe.ltp)}</td>
+                                                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{fmt(s.pe.iv, 1)}</td>
+                                                    <td className="px-2 py-1.5 text-center"><BuildupChip value={s.pe.buildup} /></td>
+                                                    <td className={`px-2 py-1.5 text-right tabular-nums ${s.pe.changeOi >= 0 ? "text-green-400" : "text-red-400"}`}>{compact(s.pe.changeOi)}</td>
+                                                    <td className={`px-2 py-1.5 text-right tabular-nums ${itmPut ? "bg-green-500/5" : ""} text-gray-300`}>{compact(s.pe.oi)}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <table className="w-full min-w-[820px] border-collapse text-xs">
+                                    <thead>
+                                        <tr className="border-b border-gray-700 text-gray-500">
+                                            <th colSpan={4} className="bg-red-500/5 py-1.5 text-center font-medium text-red-300">CALLS</th>
+                                            <th className="py-1.5 text-center font-medium text-gray-400">STRIKE</th>
+                                            <th colSpan={4} className="bg-green-500/5 py-1.5 text-center font-medium text-green-300">PUTS</th>
+                                        </tr>
+                                        <tr className="border-b border-gray-700 text-[11px] uppercase tracking-wide text-gray-500">
+                                            <th className="px-2 py-1.5 text-right font-medium">Delta</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">Gamma</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">Theta</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">Vega</th>
+                                            <th className="px-2 py-1.5 text-center font-medium text-gray-300">Strike</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">Delta</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">Gamma</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">Theta</th>
+                                            <th className="px-2 py-1.5 text-right font-medium">Vega</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {data.strikes.map((s) => {
+                                            const isAtm = s.strike === data.atmStrike;
+                                            return (
+                                                <tr key={s.strike} className={`border-b border-gray-800/70 ${isAtm ? "bg-teal-500/10" : "hover:bg-gray-800/40"}`}>
+                                                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-300">{fmt(s.ce.greeks?.delta ?? null, 3)}</td>
+                                                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{fmt(s.ce.greeks?.gamma ?? null, 4)}</td>
+                                                    <td className="px-2 py-1.5 text-right tabular-nums text-red-300">{fmt(s.ce.greeks?.theta ?? null, 1)}</td>
+                                                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{fmt(s.ce.greeks?.vega ?? null, 1)}</td>
+                                                    <td className={`px-2 py-1.5 text-center font-semibold tabular-nums ${isAtm ? "text-teal-300" : "text-gray-200"}`}>{s.strike}</td>
+                                                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-300">{fmt(s.pe.greeks?.delta ?? null, 3)}</td>
+                                                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{fmt(s.pe.greeks?.gamma ?? null, 4)}</td>
+                                                    <td className="px-2 py-1.5 text-right tabular-nums text-red-300">{fmt(s.pe.greeks?.theta ?? null, 1)}</td>
+                                                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{fmt(s.pe.greeks?.vega ?? null, 1)}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            )}
                         </div>
                         <p className="mt-3 text-[11px] text-gray-600">
-                            Source: NSE (delayed snapshot) · ATM row highlighted · research/education only, not investment advice
+                            {tableView === "greeks"
+                                ? "Black-Scholes Greeks (r≈6.5%, per-day theta, vega per 1% IV) · estimates from delayed IV"
+                                : "Bias: LB long buildup · SB short buildup · SC short covering · LU long unwinding"}
+                            {" · "}research/education only, not investment advice
                         </p>
                     </div>
                 </div>

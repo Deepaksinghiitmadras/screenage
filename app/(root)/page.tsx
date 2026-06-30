@@ -5,6 +5,7 @@ import NewsFeed from "@/components/market/NewsFeed";
 import MarketOverviewNative from "@/components/market/MarketOverviewNative";
 import MarketHeatmap from "@/components/market/MarketHeatmap";
 import EconomicCalendar from "@/components/market/EconomicCalendar";
+import MarketRegimeBanner from "@/components/market/MarketRegimeBanner";
 import { getMovers, getHeatmap } from "@/lib/actions/market.actions";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,11 @@ const Home = async () => {
         <div className="min-h-screen home-wrapper">
             {/* Indices ticker strip */}
             <IndicesTicker />
+
+            {/* Overall market regime */}
+            <div className="mt-6 w-full">
+                <MarketRegimeBanner />
+            </div>
 
             {/* Three-column layout: Market Overview (left) · movers + heatmap (center) · Latest News (right) */}
             <div className="mt-6 grid w-full gap-6 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_340px]">

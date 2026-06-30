@@ -61,6 +61,73 @@ export function OIDistributionChart({ strikes, atmStrike }: { strikes: OptionStr
     );
 }
 
+export function MaxPainChart({
+    curve,
+    maxPain,
+    underlying,
+}: {
+    curve: OptionMaxPainPoint[];
+    maxPain: number | null;
+    underlying: number | null;
+}) {
+    if (!curve || curve.length < 2) {
+        return <p className="py-6 text-sm text-gray-500">Max-pain data not available for this expiry.</p>;
+    }
+
+    const H = 240;
+    const padTop = 12;
+    const padBottom = 36;
+    const plotH = H - padTop - padBottom;
+    const group = 30;
+    const W = Math.max(640, curve.length * group);
+    const barW = group * 0.6;
+    const maxLoss = niceMax(Math.max(...curve.map((c) => c.loss), 1));
+    const y = (loss: number) => padTop + plotH - (loss / maxLoss) * plotH;
+
+    const spotStrike =
+        underlying != null
+            ? curve.reduce((best, c) => (Math.abs(c.strike - underlying) < Math.abs(best.strike - underlying) ? c : best), curve[0]).strike
+            : null;
+
+    return (
+        <div className="overflow-x-auto">
+            <svg width={W} height={H} className="block">
+                {[0.25, 0.5, 0.75, 1].map((g) => (
+                    <line key={g} x1={0} x2={W} y1={padTop + plotH - g * plotH} y2={padTop + plotH - g * plotH} stroke="#374151" strokeWidth={0.5} />
+                ))}
+                {curve.map((c, i) => {
+                    const cx = i * group + group / 2;
+                    const isPain = c.strike === maxPain;
+                    const isSpot = c.strike === spotStrike;
+                    return (
+                        <g key={c.strike}>
+                            <rect
+                                x={cx - barW / 2}
+                                y={y(c.loss)}
+                                width={barW}
+                                height={padTop + plotH - y(c.loss)}
+                                fill={isPain ? "#fbbf24" : "#60a5fa"}
+                                opacity={isPain ? 0.95 : 0.55}
+                            />
+                            {isSpot && <line x1={cx} x2={cx} y1={padTop} y2={padTop + plotH} stroke="#14b8a6" strokeDasharray="3 3" strokeWidth={1} />}
+                            {i % 2 === 0 && (
+                                <text x={cx} y={H - 20} fill={isPain ? "#fcd34d" : "#9ca3af"} fontSize={9} textAnchor="middle">
+                                    {c.strike}
+                                </text>
+                            )}
+                        </g>
+                    );
+                })}
+            </svg>
+            <div className="mt-1 flex flex-wrap items-center gap-4 px-1 text-xs text-gray-400">
+                <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 rounded-sm" style={{ background: "#fbbf24" }} /> Max Pain {maxPain ?? "—"}</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 rounded-sm" style={{ background: "#60a5fa" }} /> Writer loss</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-2 w-3" style={{ borderTop: "2px dashed #14b8a6" }} /> Spot</span>
+            </div>
+        </div>
+    );
+}
+
 export function IVSmileChart({ strikes, atmStrike }: { strikes: OptionStrike[]; atmStrike: number | null }) {
     const pts = strikes.filter((s) => (s.ce.iv ?? 0) > 0 || (s.pe.iv ?? 0) > 0);
     if (pts.length < 2) {

@@ -4,3 +4,5 @@ yfinance>=1.4.1
 nselib==2.5.1
 curl_cffi>=0.7.0
 cachetools==5.5.0
+numpy>=1.26
+pandas>=2.0

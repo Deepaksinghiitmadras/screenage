@@ -83,6 +83,130 @@ function normalizedSlope(values: number[]): number {
 const fmt = (v: number | null, d = 2): string =>
     v === null || v === undefined || Number.isNaN(v) ? '—' : v.toFixed(d);
 
+// --- Advanced indicator math (OHLC) ------------------------------------------
+
+/** Wilder's smoothing of a series over `period`. */
+function wilderSmooth(values: number[], period: number): number[] {
+    if (values.length < period) return [];
+    const out: number[] = [];
+    let prev = values.slice(0, period).reduce((a, b) => a + b, 0); // first = sum
+    out.push(prev);
+    for (let i = period; i < values.length; i++) {
+        prev = prev - prev / period + values[i];
+        out.push(prev);
+    }
+    return out;
+}
+
+function trueRanges(high: number[], low: number[], close: number[]): number[] {
+    const tr: number[] = [];
+    for (let i = 1; i < high.length; i++) {
+        tr.push(Math.max(high[i] - low[i], Math.abs(high[i] - close[i - 1]), Math.abs(low[i] - close[i - 1])));
+    }
+    return tr;
+}
+
+/** Average True Range (Wilder). */
+function atr(high: number[], low: number[], close: number[], period = 14): number | null {
+    const tr = trueRanges(high, low, close);
+    if (tr.length < period) return null;
+    let a = tr.slice(0, period).reduce((x, y) => x + y, 0) / period;
+    for (let i = period; i < tr.length; i++) a = (a * (period - 1) + tr[i]) / period;
+    return a;
+}
+
+/** ADX with +DI / -DI (Wilder). */
+function adx(high: number[], low: number[], close: number[], period = 14): { adx: number; plusDI: number; minusDI: number } | null {
+    const n = high.length;
+    if (n < period * 2 + 1) return null;
+    const tr: number[] = [];
+    const plusDM: number[] = [];
+    const minusDM: number[] = [];
+    for (let i = 1; i < n; i++) {
+        const up = high[i] - high[i - 1];
+        const down = low[i - 1] - low[i];
+        plusDM.push(up > down && up > 0 ? up : 0);
+        minusDM.push(down > up && down > 0 ? down : 0);
+        tr.push(Math.max(high[i] - low[i], Math.abs(high[i] - close[i - 1]), Math.abs(low[i] - close[i - 1])));
+    }
+    const trS = wilderSmooth(tr, period);
+    const plusS = wilderSmooth(plusDM, period);
+    const minusS = wilderSmooth(minusDM, period);
+    const dx: number[] = [];
+    for (let i = 0; i < trS.length; i++) {
+        const pdi = trS[i] === 0 ? 0 : (100 * plusS[i]) / trS[i];
+        const mdi = trS[i] === 0 ? 0 : (100 * minusS[i]) / trS[i];
+        const denom = pdi + mdi;
+        dx.push(denom === 0 ? 0 : (100 * Math.abs(pdi - mdi)) / denom);
+    }
+    if (dx.length < period) return null;
+    let adxVal = dx.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = period; i < dx.length; i++) adxVal = (adxVal * (period - 1) + dx[i]) / period;
+    const lastIdx = trS.length - 1;
+    const plusDI = trS[lastIdx] === 0 ? 0 : (100 * plusS[lastIdx]) / trS[lastIdx];
+    const minusDI = trS[lastIdx] === 0 ? 0 : (100 * minusS[lastIdx]) / trS[lastIdx];
+    return { adx: adxVal, plusDI, minusDI };
+}
+
+/** Bollinger Bands → bands + %B + bandwidth. */
+function bollinger(closes: number[], period = 20, mult = 2): { upper: number; mid: number; lower: number; percentB: number; widthPct: number } | null {
+    if (closes.length < period) return null;
+    const slice = closes.slice(-period);
+    const mid = slice.reduce((a, b) => a + b, 0) / period;
+    const sd = stdev(slice);
+    const upper = mid + mult * sd;
+    const lower = mid - mult * sd;
+    const price = closes[closes.length - 1];
+    const percentB = upper === lower ? 50 : ((price - lower) / (upper - lower)) * 100;
+    const widthPct = mid === 0 ? 0 : ((upper - lower) / mid) * 100;
+    return { upper, mid, lower, percentB, widthPct };
+}
+
+/** Stochastic %K over `period`. */
+function stochasticK(high: number[], low: number[], close: number[], period = 14): number | null {
+    if (close.length < period) return null;
+    const hi = Math.max(...high.slice(-period));
+    const lo = Math.min(...low.slice(-period));
+    return hi === lo ? 50 : ((close[close.length - 1] - lo) / (hi - lo)) * 100;
+}
+
+/** Commodity Channel Index. */
+function cci(high: number[], low: number[], close: number[], period = 20): number | null {
+    const n = close.length;
+    if (n < period) return null;
+    const tp: number[] = [];
+    for (let i = n - period; i < n; i++) tp.push((high[i] + low[i] + close[i]) / 3);
+    const mean = tp.reduce((a, b) => a + b, 0) / period;
+    const meanDev = tp.reduce((a, b) => a + Math.abs(b - mean), 0) / period;
+    return meanDev === 0 ? 0 : (tp[tp.length - 1] - mean) / (0.015 * meanDev);
+}
+
+/** Williams %R over `period`. */
+function williamsR(high: number[], low: number[], close: number[], period = 14): number | null {
+    if (close.length < period) return null;
+    const hi = Math.max(...high.slice(-period));
+    const lo = Math.min(...low.slice(-period));
+    return hi === lo ? -50 : (-100 * (hi - close[close.length - 1])) / (hi - lo);
+}
+
+/** Resample daily closes into period-end closes by ISO week or calendar month. */
+function resampleCloses(candles: { time: string; close: number }[], unit: 'W' | 'M'): number[] {
+    const buckets = new Map<string, number>();
+    for (const c of candles) {
+        const d = new Date(c.time);
+        let key: string;
+        if (unit === 'M') {
+            key = `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
+        } else {
+            const onejan = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            const week = Math.ceil(((d.getTime() - onejan.getTime()) / 86400000 + onejan.getUTCDay() + 1) / 7);
+            key = `${d.getUTCFullYear()}-W${week}`;
+        }
+        buckets.set(key, c.close); // last close in the bucket wins (insertion order = chronological)
+    }
+    return Array.from(buckets.values());
+}
+
 // --- Forecast (geometric Brownian projection with confidence band) -----------
 
 function buildForecast(closes: number[]): PriceForecast | undefined {
@@ -132,11 +256,28 @@ function buildForecast(closes: number[]): PriceForecast | undefined {
 
 // --- Main action -------------------------------------------------------------
 
-export async function getTechnicalSignals(symbol: string): Promise<TechnicalSignals> {
+export async function getTechnicalSignals(symbol: string, config?: Partial<TechnicalConfig>): Promise<TechnicalSignals> {
     const sym = symbol.trim().toUpperCase();
-    const history = await getHistory(sym, '1y');
-    const closes = history.candles.map((c) => c.close);
-    const volumes = history.candles.map((c) => c.volume);
+    const clamp = (v: number | undefined, d: number, lo: number, hi: number) =>
+        Math.max(lo, Math.min(hi, Math.round(v ?? d)));
+    const cfg: TechnicalConfig = {
+        rsiPeriod: clamp(config?.rsiPeriod, 14, 2, 50),
+        smaFast: clamp(config?.smaFast, 20, 3, 100),
+        smaMid: clamp(config?.smaMid, 50, 5, 200),
+        smaLong: clamp(config?.smaLong, 200, 20, 300),
+        bbPeriod: clamp(config?.bbPeriod, 20, 5, 100),
+        bbStd: Math.max(1, Math.min(4, config?.bbStd ?? 2)),
+        adxPeriod: clamp(config?.adxPeriod, 14, 5, 50),
+        atrPeriod: clamp(config?.atrPeriod, 14, 5, 50),
+    };
+
+    // 2y of candles so weekly/monthly RSI has enough samples.
+    const history = await getHistory(sym, '2y');
+    const candles = history.candles;
+    const closes = candles.map((c) => c.close);
+    const highs = candles.map((c) => c.high);
+    const lows = candles.map((c) => c.low);
+    const volumes = candles.map((c) => c.volume);
 
     if (closes.length < 50) {
         return {
@@ -148,15 +289,16 @@ export async function getTechnicalSignals(symbol: string): Promise<TechnicalSign
             regime: 'Unknown',
             regimeNote: 'Not enough price history to compute technical signals.',
             indicators: [],
+            config: cfg,
             error: 'Insufficient history.',
         };
     }
 
     const price = closes[closes.length - 1];
-    const sma20 = sma(closes, 20);
-    const sma50 = sma(closes, 50);
-    const sma200 = sma(closes, 200);
-    const rsi14 = rsi(closes, 14);
+    const smaFast = sma(closes, cfg.smaFast);
+    const smaMid = sma(closes, cfg.smaMid);
+    const smaLong = sma(closes, cfg.smaLong);
+    const rsiVal = rsi(closes, cfg.rsiPeriod);
     const macdVal = macd(closes);
     const high20 = Math.max(...closes.slice(-20));
     const low20 = Math.min(...closes.slice(-20));
@@ -166,84 +308,158 @@ export async function getTechnicalSignals(symbol: string): Promise<TechnicalSign
     const indicators: TechnicalIndicator[] = [];
     let score = 50;
 
-    // Trend vs SMA50
-    if (sma50 != null) {
-        const above = price > sma50;
+    // --- Trend ---------------------------------------------------------------
+    if (smaMid != null) {
+        const above = price > smaMid;
         score += above ? 10 : -10;
         indicators.push({
-            label: 'Price vs SMA50',
-            value: `₹${fmt(price)} vs ₹${fmt(sma50)}`,
+            label: `Price vs SMA${cfg.smaMid}`, category: 'Trend',
+            value: `₹${fmt(price)} vs ₹${fmt(smaMid)}`,
             signal: above ? 'bull' : 'bear',
-            note: above ? 'Trading above the 50-day average' : 'Trading below the 50-day average',
+            note: above ? `Trading above the ${cfg.smaMid}-day average` : `Trading below the ${cfg.smaMid}-day average`,
         });
     }
-
-    // Short vs medium trend
-    if (sma20 != null && sma50 != null) {
-        const golden = sma20 > sma50;
+    if (smaFast != null && smaMid != null) {
+        const golden = smaFast > smaMid;
         score += golden ? 8 : -8;
         indicators.push({
-            label: 'SMA20 vs SMA50',
-            value: `${fmt(sma20)} / ${fmt(sma50)}`,
+            label: `SMA${cfg.smaFast} vs SMA${cfg.smaMid}`, category: 'Trend',
+            value: `${fmt(smaFast)} / ${fmt(smaMid)}`,
             signal: golden ? 'bull' : 'bear',
             note: golden ? 'Short-term momentum above medium-term' : 'Short-term momentum below medium-term',
         });
     }
-
-    // Long-term trend
-    if (sma200 != null) {
-        const above = price > sma200;
+    if (smaLong != null) {
+        const above = price > smaLong;
         score += above ? 8 : -8;
         indicators.push({
-            label: 'Price vs SMA200',
-            value: `₹${fmt(price)} vs ₹${fmt(sma200)}`,
+            label: `Price vs SMA${cfg.smaLong}`, category: 'Trend',
+            value: `₹${fmt(price)} vs ₹${fmt(smaLong)}`,
             signal: above ? 'bull' : 'bear',
             note: above ? 'In a long-term uptrend' : 'In a long-term downtrend',
         });
     }
 
-    // RSI
-    if (rsi14 != null) {
+    // ADX / DI — trend strength + direction.
+    const adxVal = adx(highs, lows, closes, cfg.adxPeriod);
+    if (adxVal) {
+        const bullDir = adxVal.plusDI > adxVal.minusDI;
+        const strong = adxVal.adx >= 25;
         let sig: TechnicalSignalState = 'neutral';
-        let note = 'Momentum is neutral';
-        if (rsi14 >= 70) { sig = 'bear'; note = 'Overbought — pullback risk'; score -= 4; }
-        else if (rsi14 >= 55) { sig = 'bull'; note = 'Bullish momentum'; score += 8; }
-        else if (rsi14 <= 30) { sig = 'bull'; note = 'Oversold — possible bounce'; score += 4; }
-        else if (rsi14 <= 45) { sig = 'bear'; note = 'Weak momentum'; score -= 8; }
-        indicators.push({ label: 'RSI (14)', value: fmt(rsi14, 1), signal: sig, note });
+        if (strong) { sig = bullDir ? 'bull' : 'bear'; score += bullDir ? 8 : -8; }
+        indicators.push({
+            label: `ADX (${cfg.adxPeriod})`, category: 'Trend',
+            value: `${fmt(adxVal.adx, 1)} · +DI ${fmt(adxVal.plusDI, 0)} / -DI ${fmt(adxVal.minusDI, 0)}`,
+            signal: sig,
+            note: !strong ? 'No clear trend (ADX < 25)' : bullDir ? 'Strong uptrend' : 'Strong downtrend',
+        });
     }
 
-    // MACD
+    // --- Momentum ------------------------------------------------------------
+    if (rsiVal != null) {
+        let sig: TechnicalSignalState = 'neutral';
+        let note = 'Momentum is neutral';
+        if (rsiVal >= 70) { sig = 'bear'; note = 'Overbought — pullback risk'; score -= 4; }
+        else if (rsiVal >= 55) { sig = 'bull'; note = 'Bullish momentum'; score += 8; }
+        else if (rsiVal <= 30) { sig = 'bull'; note = 'Oversold — possible bounce'; score += 4; }
+        else if (rsiVal <= 45) { sig = 'bear'; note = 'Weak momentum'; score -= 8; }
+        indicators.push({ label: `RSI (${cfg.rsiPeriod})`, category: 'Momentum', value: fmt(rsiVal, 1), signal: sig, note });
+    }
+
     if (macdVal) {
         const bull = macdVal.hist > 0;
         score += bull ? 8 : -8;
         indicators.push({
-            label: 'MACD',
+            label: 'MACD (12,26,9)', category: 'Momentum',
             value: `hist ${fmt(macdVal.hist)}`,
             signal: bull ? 'bull' : 'bear',
             note: bull ? 'MACD above signal line' : 'MACD below signal line',
         });
     }
 
-    // 20-day breakout position
+    const stoch = stochasticK(highs, lows, closes, 14);
+    if (stoch != null) {
+        let sig: TechnicalSignalState = 'neutral';
+        if (stoch >= 80) sig = 'bear';
+        else if (stoch <= 20) sig = 'bull';
+        indicators.push({
+            label: 'Stochastic %K (14)', category: 'Momentum',
+            value: `${fmt(stoch, 0)}%`,
+            signal: sig,
+            note: stoch >= 80 ? 'Overbought zone' : stoch <= 20 ? 'Oversold zone' : 'Mid zone',
+        });
+    }
+
+    const cciVal = cci(highs, lows, closes, 20);
+    if (cciVal != null) {
+        let sig: TechnicalSignalState = 'neutral';
+        if (cciVal > 100) { sig = 'bull'; score += 3; }
+        else if (cciVal < -100) { sig = 'bear'; score -= 3; }
+        indicators.push({
+            label: 'CCI (20)', category: 'Momentum',
+            value: fmt(cciVal, 0),
+            signal: sig,
+            note: cciVal > 100 ? 'Strong upside momentum' : cciVal < -100 ? 'Strong downside momentum' : 'Neutral momentum',
+        });
+    }
+
+    const wr = williamsR(highs, lows, closes, 14);
+    if (wr != null) {
+        let sig: TechnicalSignalState = 'neutral';
+        if (wr >= -20) sig = 'bear';
+        else if (wr <= -80) sig = 'bull';
+        indicators.push({
+            label: 'Williams %R (14)', category: 'Momentum',
+            value: fmt(wr, 0),
+            signal: sig,
+            note: wr >= -20 ? 'Overbought' : wr <= -80 ? 'Oversold' : 'Neutral',
+        });
+    }
+
+    // --- Volatility ----------------------------------------------------------
+    const bb = bollinger(closes, cfg.bbPeriod, cfg.bbStd);
+    if (bb) {
+        let sig: TechnicalSignalState = 'neutral';
+        if (bb.percentB >= 100) sig = 'bear';
+        else if (bb.percentB <= 0) sig = 'bull';
+        indicators.push({
+            label: `Bollinger %B (${cfg.bbPeriod},${cfg.bbStd})`, category: 'Volatility',
+            value: `${fmt(bb.percentB, 0)}% · width ${fmt(bb.widthPct, 1)}%`,
+            signal: sig,
+            note: bb.percentB >= 100 ? 'Above upper band — stretched' : bb.percentB <= 0 ? 'Below lower band — stretched' : 'Inside bands',
+        });
+    }
+
+    const atrVal = atr(highs, lows, closes, cfg.atrPeriod);
+    if (atrVal != null) {
+        const atrPct = (atrVal / price) * 100;
+        indicators.push({
+            label: `ATR (${cfg.atrPeriod})`, category: 'Volatility',
+            value: `₹${fmt(atrVal)} · ${fmt(atrPct, 1)}%`,
+            signal: 'neutral',
+            note: atrPct > 4 ? 'High daily volatility' : atrPct < 1.5 ? 'Low daily volatility' : 'Moderate volatility',
+        });
+    }
+
+    // 20-day range position.
     const range = high20 - low20;
     const pos = range > 0 ? ((price - low20) / range) * 100 : 50;
     let bsig: TechnicalSignalState = 'neutral';
     if (pos >= 80) { bsig = 'bull'; score += 5; }
     else if (pos <= 20) { bsig = 'bear'; score -= 5; }
     indicators.push({
-        label: '20-day range',
+        label: '20-day range', category: 'Volatility',
         value: `${pos.toFixed(0)}% of range`,
         signal: bsig,
         note: pos >= 80 ? 'Near 20-day high' : pos <= 20 ? 'Near 20-day low' : 'Mid-range',
     });
 
-    // Volume
+    // --- Volume --------------------------------------------------------------
     if (volAvg20 != null && volAvg20 > 0) {
         const ratio = lastVol / volAvg20;
         const heavy = ratio > 1.3;
         indicators.push({
-            label: 'Volume',
+            label: 'Volume', category: 'Volume',
             value: `${ratio.toFixed(2)}× avg`,
             signal: 'neutral',
             note: heavy ? 'Above-average activity' : 'Normal activity',
@@ -253,18 +469,35 @@ export async function getTechnicalSignals(symbol: string): Promise<TechnicalSign
     score = Math.max(0, Math.min(100, Math.round(score)));
     const bias: TechnicalSignals['bias'] = score >= 60 ? 'Bullish' : score <= 40 ? 'Bearish' : 'Neutral';
 
-    // Regime detection
+    // Multi-timeframe RSI (Daily / Weekly / Monthly).
+    const rsiSignal = (r: number | null): TechnicalSignalState =>
+        r == null ? 'neutral' : r >= 55 ? 'bull' : r <= 45 ? 'bear' : 'neutral';
+    const weeklyCloses = resampleCloses(candles, 'W');
+    const monthlyCloses = resampleCloses(candles, 'M');
+    const multiTimeframe: TechnicalTimeframeRSI[] = [
+        { timeframe: 'Daily', rsi: round1(rsi(closes, cfg.rsiPeriod)), signal: rsiSignal(rsi(closes, cfg.rsiPeriod)) },
+        { timeframe: 'Weekly', rsi: round1(rsi(weeklyCloses, cfg.rsiPeriod)), signal: rsiSignal(rsi(weeklyCloses, cfg.rsiPeriod)) },
+        { timeframe: 'Monthly', rsi: round1(rsi(monthlyCloses, cfg.rsiPeriod)), signal: rsiSignal(rsi(monthlyCloses, cfg.rsiPeriod)) },
+    ];
+
+    // Regime detection.
     const logRet: number[] = [];
     const tail = closes.slice(-60);
     for (let i = 1; i < tail.length; i++) logRet.push(Math.log(tail[i] / tail[i - 1]));
     const annVol = stdev(logRet) * Math.sqrt(252) * 100;
-    const slope = normalizedSlope(closes.slice(-30)); // % per day
+    const slope = normalizedSlope(closes.slice(-30));
 
     let regime: string;
     let regimeNote: string;
     if (annVol > 45) {
         regime = 'High Volatility';
         regimeNote = `Elevated volatility (~${annVol.toFixed(0)}% annualized) — signals are less reliable.`;
+    } else if (adxVal && adxVal.adx >= 25 && slope > 0) {
+        regime = 'Trending Up';
+        regimeNote = `Strong uptrend (ADX ${adxVal.adx.toFixed(0)}).`;
+    } else if (adxVal && adxVal.adx >= 25 && slope < 0) {
+        regime = 'Trending Down';
+        regimeNote = `Strong downtrend (ADX ${adxVal.adx.toFixed(0)}).`;
     } else if (slope > 0.15) {
         regime = 'Trending Up';
         regimeNote = 'Price is in a sustained uptrend.';
@@ -285,8 +518,22 @@ export async function getTechnicalSignals(symbol: string): Promise<TechnicalSign
         regime,
         regimeNote,
         indicators,
+        multiTimeframe,
+        bands: bb ? {
+            price: +price.toFixed(2),
+            upper: +bb.upper.toFixed(2),
+            mid: +bb.mid.toFixed(2),
+            lower: +bb.lower.toFixed(2),
+            percentB: +bb.percentB.toFixed(1),
+            widthPct: +bb.widthPct.toFixed(1),
+        } : undefined,
+        config: cfg,
         forecast: buildForecast(closes),
     };
+}
+
+function round1(v: number | null): number | null {
+    return v == null ? null : +v.toFixed(1);
 }
 
 // --- Market-wide technical scan ----------------------------------------------

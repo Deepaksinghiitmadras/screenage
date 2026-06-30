@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "screenage-market": {
+      "command": "python",
+      "args": ["/absolute/path/to/OpenStock/mcp-server/server.py"],
+      "env": {
+        "MARKET_SERVICE_URL": "http://127.0.0.1:8000"
+      }
+    }
+  }
+}

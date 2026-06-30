@@ -32,6 +32,25 @@ export async function getIndices(): Promise<MarketIndex[]> {
     return data.indices;
 }
 
+export async function getMarketRegime(config?: Partial<MarketRegimeConfig>): Promise<MarketRegime> {
+    const params = new URLSearchParams();
+    if (config?.vixHigh) params.set('vix_high', String(config.vixHigh));
+    if (config?.lookback) params.set('lookback', String(config.lookback));
+    const qs = params.toString();
+
+    const fallback: MarketRegime = {
+        regime: 'Unknown', risk: 'neutral', note: 'Market regime is temporarily unavailable.',
+        nifty: { price: 0, changePercent: 0, vsSma50Pct: 0, vsSma200Pct: 0, slopePctPerDay: 0 },
+        vix: null, vixHigh: config?.vixHigh ?? 16, annualizedVolPct: 0,
+        breadthPct: 0, advancers: 0, decliners: 0, universe: 0,
+        available: false,
+    };
+
+    const data = await fetchMarket<MarketRegime>(`/market-regime${qs ? `?${qs}` : ''}`, 300, fallback);
+    return { ...data, available: data.regime !== 'Unknown' || data.universe > 0 };
+}
+
+
 export async function getMovers(): Promise<MarketMovers> {
     return fetchMarket<MarketMovers>(
         '/movers',

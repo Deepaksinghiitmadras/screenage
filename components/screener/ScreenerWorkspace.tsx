@@ -20,6 +20,7 @@ import {
 } from "@/lib/actions/screener.actions";
 import { getMarketScan } from "@/lib/actions/technical.actions";
 import AssistantChat from "@/components/assistant/AssistantChat";
+import RegimeBadge from "@/components/RegimeBadge";
 
 type ConvoSummary = { _id: string; title: string; updatedAt: string };
 type Tab = "screen" | "scan" | "assistant";
@@ -380,7 +381,7 @@ export default function ScreenerWorkspace({
                                                             <span className={`font-semibold tabular-nums ${biasColor(r.bias)}`}>{r.score}</span>
                                                         </td>
                                                         <td className={`px-3 py-2.5 font-medium ${biasColor(r.bias)}`}>{r.bias}</td>
-                                                        <td className="px-3 py-2.5 text-gray-400">{r.regime}</td>
+                                                        <td className="px-3 py-2.5"><RegimeBadge regime={r.regime} size="xs" /></td>
                                                         <td className="px-3 py-2.5 text-right tabular-nums text-gray-300">{r.rsi != null ? r.rsi.toFixed(0) : "—"}</td>
                                                     </tr>
                                                 ))}

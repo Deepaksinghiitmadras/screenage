@@ -7,6 +7,8 @@ import FundamentalsPanel from "@/components/stocks/FundamentalsPanel";
 import AIAnalysisCard from "@/components/stocks/AIAnalysisCard";
 import PeerComparison from "@/components/stocks/PeerComparison";
 import TechnicalSignalCard from "@/components/stocks/TechnicalSignalCard";
+import AIForecastCard from "@/components/stocks/AIForecastCard";
+import StockScorecard from "@/components/stocks/StockScorecard";
 import AdvancedChart from "@/components/stocks/AdvancedChart";
 import {
     TECHNICAL_ANALYSIS_WIDGET_CONFIG,
@@ -93,10 +95,12 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
             <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
                 <div className="flex flex-col gap-6 lg:col-span-2">
                     <AIAnalysisCard symbol={symbol} />
+                    <AIForecastCard symbol={symbol} />
                     <FundamentalsPanel symbol={symbol} showHeader={false} />
                     <PeerComparison symbol={symbol} />
                 </div>
                 <div className="flex flex-col gap-6">
+                    <StockScorecard symbol={symbol} />
                     <TechnicalSignalCard symbol={symbol} />
                     <Suspense fallback={<div className="h-40 animate-pulse rounded-2xl border border-gray-700 bg-gray-800" />}>
                         <HeadlineSentimentCard symbol={symbol} />

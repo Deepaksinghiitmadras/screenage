@@ -3,6 +3,7 @@ export const NAV_ITEMS = [
     { href: '/search', label: 'Search' },
     { href: '/screener', label: 'Screener' },
     { href: '/options', label: 'Options' },
+    { href: '/backtest', label: 'Backtest' },
     { href: '/watchlist', label: 'Watchlist' },
 ];
 

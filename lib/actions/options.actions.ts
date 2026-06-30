@@ -7,9 +7,10 @@
 
 const MARKET_SERVICE_URL = process.env.MARKET_SERVICE_URL ?? 'http://127.0.0.1:8000';
 
-export async function getOptionChain(symbol: string, expiry?: string): Promise<OptionChainData> {
+export async function getOptionChain(symbol: string, expiry?: string, strikesEachSide?: number): Promise<OptionChainData> {
     const params = new URLSearchParams({ symbol: symbol.trim().toUpperCase() });
     if (expiry) params.set('expiry', expiry);
+    if (strikesEachSide) params.set('strikes_each_side', String(strikesEachSide));
 
     const fallback: OptionChainData = {
         symbol: symbol.toUpperCase(),

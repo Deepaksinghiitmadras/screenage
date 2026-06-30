@@ -6,6 +6,18 @@ uvicorn main:app --port 8000
 # Terminal 2 — the app (as before)
 npm run dev
 
+or 
+
+# terminal 1: Python service
+source market-service/.venv/bin/activate && uvicorn --app-dir market-service main:app --port 8000
+# terminal 2: Next app
+npm run dev
+
+
+When happy: git add -A && git commit -m "..." && git push
+
+
+
 The 30-day forecast is a statistical Geometric Brownian Motion projection (drift from mean log-returns, dampened ×0.5 and capped ±25%, with an 80% volatility band) computed in TypeScript. The technical score is a rules-based composite (SMA/RSI/MACD/range/volume).
 
 Accurate labels: "statistical price projection (GBM)", "probabilistic forecast", or "quantitative projection". I'd avoid "statistical trading" since it implies a tradeable signal.

@@ -12,11 +12,11 @@ const Layout = async ({ children }: { children : React.ReactNode }) => {
     return (
         <main className="auth-layout">
             <section className="auth-left-section scrollbar-hide-default">
-                <Link href="/" className="auth-logo flex items-center gap-2">
+                <Link href="/" className="auth-logo flex items-center justify-center gap-2">
                     <span className="text-3xl font-bold text-white">Screenage</span>
                 </Link>
 
-                <div className="pb-6 lg:pb-8 flex-1">
+                <div className="pb-2">
                     {children}
                 </div>
             </section>

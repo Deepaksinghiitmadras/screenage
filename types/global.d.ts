@@ -189,12 +189,28 @@ declare global {
         error?: string;
     };
 
+    type OptionBuildup =
+        | 'long_buildup'
+        | 'short_buildup'
+        | 'short_covering'
+        | 'long_unwinding'
+        | 'neutral';
+
+    type OptionGreeks = {
+        delta: number | null;
+        gamma: number | null;
+        theta: number | null;
+        vega: number | null;
+    };
+
     type OptionSide = {
         oi: number;
         changeOi: number;
         volume: number;
         iv: number | null;
         ltp: number | null;
+        buildup?: OptionBuildup;
+        greeks?: OptionGreeks;
     };
 
     type OptionStrike = {
@@ -202,6 +218,8 @@ declare global {
         ce: OptionSide;
         pe: OptionSide;
     };
+
+    type OptionMaxPainPoint = { strike: number; loss: number };
 
     type OptionChainData = {
         symbol: string;
@@ -212,20 +230,185 @@ declare global {
         atmStrike: number | null;
         pcr: number | null;
         maxPain: number | null;
+        daysToExpiry?: number;
+        support?: number | null;
+        resistance?: number | null;
+        atmStraddle?: number | null;
         totalCeOi: number;
         totalPeOi: number;
+        maxPainCurve?: OptionMaxPainPoint[];
         strikes: OptionStrike[];
+        available?: boolean;
+        error?: string;
+    };
+
+    type MarketRegimeConfig = { vixHigh: number; lookback: number };
+
+    type MarketRegime = {
+        regime: string;
+        risk: 'risk-on' | 'risk-off' | 'neutral';
+        note: string;
+        nifty: {
+            price: number;
+            changePercent: number;
+            vsSma50Pct: number;
+            vsSma200Pct: number;
+            slopePctPerDay: number;
+        };
+        vix: number | null;
+        vixHigh: number;
+        annualizedVolPct: number;
+        breadthPct: number;
+        advancers: number;
+        decliners: number;
+        universe: number;
+        available?: boolean;
+        error?: string;
+    };
+
+    type ScorecardFactor = { label: string; value: string; note?: string };
+
+    type ScorecardAxis = {
+        key: string;
+        label: string;
+        score: number | null;     // 0-100, null when data unavailable
+        weight: number;           // default weight (0-1)
+        summary: string;
+        factors: ScorecardFactor[];
+    };
+
+    type StockScorecard = {
+        symbol: string;
+        available: boolean;
+        composite: number;        // 0-100 default (equal-weight) composite
+        grade: string;            // A+ … D
+        axes: ScorecardAxis[];
+        error?: string;
+    };
+
+    type ForecastScenario = { price: number; returnPct: number };
+
+    type ForecastDriftMode = 'balanced' | 'neutral' | 'momentum';
+
+    type ForecastConfig = {
+        horizon: number;
+        lookback: number;
+        paths: number;
+        ci: number;
+        driftMode: ForecastDriftMode;
+    };
+
+    type ForecastResult = {
+        symbol: string;
+        lastClose: number;
+        horizonDays: number;
+        ci: number;
+        lookback: number;
+        paths: number;
+        driftMode: ForecastDriftMode;
+        history: number[];
+        median: number[];
+        upper: number[];
+        lower: number[];
+        samplePaths: number[][];
+        probProfitPct: number;
+        expectedReturnPct: number;
+        downside5Pct: number;
+        annualizedVolPct: number;
+        scenarios: { bull: ForecastScenario; base: ForecastScenario; bear: ForecastScenario };
+        available?: boolean;
+        error?: string;
+    };
+
+    type BacktestStrategy = 'sma_cross' | 'rsi' | 'breakout';
+
+    type BacktestMetrics = {
+        totalReturnPct: number;
+        buyHoldReturnPct: number;
+        cagrPct: number;
+        maxDrawdownPct: number;
+        sharpe: number;
+        sortino: number;
+        calmar: number;
+        profitFactor: number;
+        winRatePct: number;
+        trades: number;
+        avgWinPct: number;
+        avgLossPct: number;
+        bestTradePct: number;
+        worstTradePct: number;
+        avgHoldBars: number;
+        maxConsecLosses: number;
+        exposurePct: number;
+        startCapital: number;
+        finalCapital: number;
+        pnl: number;
+    };
+
+    type BacktestTrade = {
+        entryDate: string;
+        exitDate: string;
+        entryPrice: number;
+        exitPrice: number;
+        returnPct: number;
+        pnl: number;
+        bars: number;
+        exit: string;
+    };
+
+    type BacktestEquityPoint = { time: string; strategy: number; buyHold: number };
+
+    type BacktestResult = {
+        symbol: string;
+        strategy: BacktestStrategy;
+        range: string;
+        params: Record<string, number>;
+        bars: number;
+        startDate: string;
+        endDate: string;
+        metrics: BacktestMetrics;
+        equityCurve: BacktestEquityPoint[];
+        trades: BacktestTrade[];
         available?: boolean;
         error?: string;
     };
 
     type TechnicalSignalState = 'bull' | 'bear' | 'neutral';
 
+    type TechnicalCategory = 'Trend' | 'Momentum' | 'Volatility' | 'Volume';
+
     type TechnicalIndicator = {
         label: string;
         value: string;
         signal: TechnicalSignalState;
         note: string;
+        category?: TechnicalCategory;
+    };
+
+    type TechnicalConfig = {
+        rsiPeriod: number;
+        smaFast: number;
+        smaMid: number;
+        smaLong: number;
+        bbPeriod: number;
+        bbStd: number;
+        adxPeriod: number;
+        atrPeriod: number;
+    };
+
+    type TechnicalTimeframeRSI = {
+        timeframe: 'Daily' | 'Weekly' | 'Monthly';
+        rsi: number | null;
+        signal: TechnicalSignalState;
+    };
+
+    type TechnicalBands = {
+        price: number;
+        upper: number;
+        mid: number;
+        lower: number;
+        percentB: number;
+        widthPct: number;
     };
 
     type PriceForecast = {
@@ -249,6 +432,9 @@ declare global {
         regime: string;
         regimeNote: string;
         indicators: TechnicalIndicator[];
+        multiTimeframe?: TechnicalTimeframeRSI[];
+        bands?: TechnicalBands;
+        config?: TechnicalConfig;
         forecast?: PriceForecast;
         error?: string;
     };

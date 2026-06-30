@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Loader2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Activity, Loader2, TrendingUp, TrendingDown, Minus, Settings } from "lucide-react";
 import { getTechnicalSignals } from "@/lib/actions/technical.actions";
+import RegimeBadge from "@/components/RegimeBadge";
 
 const SIGNAL_DOT: Record<TechnicalSignalState, string> = {
     bull: "bg-green-500",
@@ -129,11 +130,14 @@ function ForecastChart({ f }: { f: PriceForecast }) {
 export default function TechnicalSignalCard({ symbol }: { symbol: string }) {
     const [data, setData] = useState<TechnicalSignals | null>(null);
     const [loading, setLoading] = useState(true);
+    const [showSettings, setShowSettings] = useState(false);
+    const [draft, setDraft] = useState<TechnicalConfig>(DEFAULT_TECH_CONFIG);
+    const [config, setConfig] = useState<TechnicalConfig>(DEFAULT_TECH_CONFIG);
 
     useEffect(() => {
         let active = true;
         setLoading(true);
-        getTechnicalSignals(symbol).then((res) => {
+        getTechnicalSignals(symbol, config).then((res) => {
             if (active) {
                 setData(res);
                 setLoading(false);
@@ -142,14 +146,59 @@ export default function TechnicalSignalCard({ symbol }: { symbol: string }) {
         return () => {
             active = false;
         };
-    }, [symbol]);
+    }, [symbol, config]);
+
+    const dirty = JSON.stringify(draft) !== JSON.stringify(config);
+    const categories: TechnicalCategory[] = ["Trend", "Momentum", "Volatility", "Volume"];
 
     return (
         <div className="rounded-lg border border-gray-700/60 bg-gray-800/40 p-4">
-            <div className="mb-3 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-teal-400" />
-                <h3 className="text-base font-semibold text-gray-100">Technical Signals</h3>
+            <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-teal-400" />
+                    <h3 className="text-base font-semibold text-gray-100">Technical Signals</h3>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setShowSettings((v) => !v)}
+                    className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors ${showSettings ? "border-teal-500/50 bg-teal-500/15 text-teal-300" : "border-gray-700 bg-gray-800/60 text-gray-400 hover:text-teal-300"}`}
+                >
+                    <Settings className="h-3.5 w-3.5" /> Indicators
+                </button>
             </div>
+
+            {showSettings && (
+                <div className="mb-4 rounded-lg border border-gray-700/60 bg-black/20 p-3">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                        <TechNum label="RSI period" value={draft.rsiPeriod} onChange={(v) => setDraft({ ...draft, rsiPeriod: v })} min={2} max={50} />
+                        <TechNum label="SMA fast" value={draft.smaFast} onChange={(v) => setDraft({ ...draft, smaFast: v })} min={3} max={100} />
+                        <TechNum label="SMA mid" value={draft.smaMid} onChange={(v) => setDraft({ ...draft, smaMid: v })} min={5} max={200} />
+                        <TechNum label="SMA long" value={draft.smaLong} onChange={(v) => setDraft({ ...draft, smaLong: v })} min={20} max={300} />
+                        <TechNum label="Bollinger period" value={draft.bbPeriod} onChange={(v) => setDraft({ ...draft, bbPeriod: v })} min={5} max={100} />
+                        <TechNum label="Bollinger σ" value={draft.bbStd} onChange={(v) => setDraft({ ...draft, bbStd: v })} min={1} max={4} step={0.5} />
+                        <TechNum label="ADX period" value={draft.adxPeriod} onChange={(v) => setDraft({ ...draft, adxPeriod: v })} min={5} max={50} />
+                        <TechNum label="ATR period" value={draft.atrPeriod} onChange={(v) => setDraft({ ...draft, atrPeriod: v })} min={5} max={50} />
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setConfig(draft)}
+                            disabled={!dirty || loading}
+                            className="rounded-md bg-teal-500/90 px-3 py-1.5 text-xs font-medium text-gray-900 hover:bg-teal-400 disabled:opacity-40"
+                        >
+                            Apply
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setDraft(DEFAULT_TECH_CONFIG); setConfig(DEFAULT_TECH_CONFIG); }}
+                            className="rounded-md border border-gray-700 px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200"
+                        >
+                            Reset
+                        </button>
+                        {dirty && <span className="text-[11px] text-amber-300">Unapplied changes</span>}
+                    </div>
+                </div>
+            )}
 
             {loading && (
                 <div className="flex items-center gap-2 py-6 text-sm text-gray-400">
@@ -170,28 +219,57 @@ export default function TechnicalSignalCard({ symbol }: { symbol: string }) {
                             <span className={`inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold ${BIAS_STYLE[data.bias]}`}>
                                 <BiasIcon bias={data.bias} /> {data.bias}
                             </span>
-                            <span className="text-xs text-gray-400">
-                                Regime: <span className="font-medium text-gray-200">{data.regime}</span>
+                            <span className="flex items-center gap-1.5 text-xs text-gray-400">
+                                Regime: <RegimeBadge regime={data.regime} size="xs" />
                             </span>
                             <span className="max-w-md text-xs text-gray-500">{data.regimeNote}</span>
                         </div>
                     </div>
 
-                    {/* Indicators */}
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        {data.indicators.map((ind) => (
-                            <div key={ind.label} className="flex items-start gap-2 rounded-md bg-black/20 p-2.5">
-                                <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${SIGNAL_DOT[ind.signal]}`} />
-                                <div className="min-w-0">
-                                    <div className="flex items-baseline justify-between gap-2">
-                                        <span className="text-xs font-medium text-gray-300">{ind.label}</span>
-                                        <span className="text-xs tabular-nums text-gray-400">{ind.value}</span>
+                    {/* Multi-timeframe RSI */}
+                    {data.multiTimeframe && data.multiTimeframe.length > 0 && (
+                        <div className="rounded-lg border border-gray-700/60 bg-black/20 p-3">
+                            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Multi-Timeframe RSI</h4>
+                            <div className="grid grid-cols-3 gap-2">
+                                {data.multiTimeframe.map((t) => (
+                                    <div key={t.timeframe} className="rounded-md bg-gray-800/50 p-2 text-center">
+                                        <div className="text-[11px] text-gray-500">{t.timeframe}</div>
+                                        <div className={`text-lg font-bold ${t.signal === "bull" ? "text-green-400" : t.signal === "bear" ? "text-red-400" : "text-gray-300"}`}>
+                                            {t.rsi ?? "—"}
+                                        </div>
                                     </div>
-                                    <p className="text-[11px] text-gray-500">{ind.note}</p>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Bollinger band position */}
+                    {data.bands && <BandBar bands={data.bands} />}
+
+                    {/* Indicators grouped by category */}
+                    {categories.map((cat) => {
+                        const items = data.indicators.filter((i) => (i.category ?? "Trend") === cat);
+                        if (items.length === 0) return null;
+                        return (
+                            <div key={cat}>
+                                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{cat}</h4>
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    {items.map((ind) => (
+                                        <div key={ind.label} className="flex items-start gap-2 rounded-md bg-black/20 p-2.5">
+                                            <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${SIGNAL_DOT[ind.signal]}`} />
+                                            <div className="min-w-0">
+                                                <div className="flex items-baseline justify-between gap-2">
+                                                    <span className="text-xs font-medium text-gray-300">{ind.label}</span>
+                                                    <span className="text-xs tabular-nums text-gray-400">{ind.value}</span>
+                                                </div>
+                                                <p className="text-[11px] text-gray-500">{ind.note}</p>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-                        ))}
-                    </div>
+                        );
+                    })}
 
                     {/* Forecast */}
                     {data.forecast && (
@@ -217,6 +295,52 @@ export default function TechnicalSignalCard({ symbol }: { symbol: string }) {
                     )}
                 </div>
             )}
+        </div>
+    );
+}
+
+const DEFAULT_TECH_CONFIG: TechnicalConfig = {
+    rsiPeriod: 14, smaFast: 20, smaMid: 50, smaLong: 200,
+    bbPeriod: 20, bbStd: 2, adxPeriod: 14, atrPeriod: 14,
+};
+
+function TechNum({ label, value, onChange, min, max, step = 1 }: { label: string; value: number; onChange: (v: number) => void; min: number; max: number; step?: number }) {
+    return (
+        <label className="flex flex-col gap-1 text-[11px] text-gray-400">
+            {label}
+            <input
+                type="number"
+                value={value}
+                min={min}
+                max={max}
+                step={step}
+                onChange={(e) => onChange(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
+                className="rounded-md border border-gray-700 bg-gray-900/60 px-2 py-1 text-sm text-gray-100 focus:border-teal-500 focus:outline-none"
+            />
+        </label>
+    );
+}
+
+function BandBar({ bands }: { bands: TechnicalBands }) {
+    const pct = Math.max(0, Math.min(100, bands.percentB));
+    return (
+        <div className="rounded-lg border border-gray-700/60 bg-black/20 p-3">
+            <div className="mb-2 flex items-center justify-between text-xs">
+                <h4 className="font-semibold uppercase tracking-wide text-gray-400">Bollinger Position</h4>
+                <span className="text-gray-500">width {bands.widthPct}%</span>
+            </div>
+            <div className="relative h-2 rounded-full bg-gradient-to-r from-green-500/40 via-gray-600/40 to-red-500/40">
+                <div
+                    className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-gray-900 bg-teal-400"
+                    style={{ left: `${pct}%` }}
+                    title={`%B ${bands.percentB}`}
+                />
+            </div>
+            <div className="mt-1 flex justify-between text-[11px] text-gray-500 tabular-nums">
+                <span>Lower ₹{bands.lower}</span>
+                <span>Mid ₹{bands.mid}</span>
+                <span>Upper ₹{bands.upper}</span>
+            </div>
         </div>
     );
 }
