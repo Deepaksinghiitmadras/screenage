@@ -7,6 +7,10 @@ import { getUserAlerts } from '@/lib/actions/alert.actions';
 import { getNews } from '@/lib/actions/finnhub.actions';
 import WatchlistManager from '@/components/watchlist/WatchlistManager';
 import AlertsPanel from '@/components/watchlist/AlertsPanel';
+import DigestToggle from '@/components/watchlist/DigestToggle';
+import TelegramConnect from '@/components/watchlist/TelegramConnect';
+import { getDigestPreference } from '@/lib/actions/preference.actions';
+import { getTelegramStatus } from '@/lib/actions/telegram.actions';
 import NewsGrid from '@/components/watchlist/NewsGrid';
 import SearchCommand from '@/components/SearchCommand';
 import { Loader2, Eye } from 'lucide-react';
@@ -23,10 +27,12 @@ export default async function WatchlistPage() {
     const userId = session.user.id;
 
     // Parallel data fetching
-    const [watchlistItems, alerts, news] = await Promise.all([
+    const [watchlistItems, alerts, news, digestOn, telegram] = await Promise.all([
         getUserWatchlist(userId),
         getUserAlerts(userId),
-        getNews() // Initial news fetch
+        getNews(), // Initial news fetch
+        getDigestPreference(userId),
+        getTelegramStatus(userId),
     ]);
 
     const watchlistSymbols = watchlistItems.map((item: any) => item.symbol);
@@ -65,6 +71,8 @@ export default async function WatchlistPage() {
 
                 {/* Sidebar - Alerts + News */}
                 <div className="space-y-6 lg:col-span-1">
+                    <DigestToggle userId={userId} email={session.user.email} name={session.user.name ?? 'there'} initial={digestOn} />
+                    <TelegramConnect userId={userId} email={session.user.email} name={session.user.name ?? 'there'} status={telegram} />
                     <AlertsPanel alerts={alerts} />
 
                     {/* News Section */}

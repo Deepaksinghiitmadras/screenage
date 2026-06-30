@@ -8,6 +8,7 @@
 import { useState, useTransition } from "react";
 import { Activity, Loader2, Play, Search, TrendingUp, TrendingDown } from "lucide-react";
 import { runBacktest } from "@/lib/actions/backtest.actions";
+import InfoTooltip from "@/components/InfoTooltip";
 
 const PRESETS = ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "TATASTEEL", "SBIN", "ITC"];
 const RANGES = ["1y", "2y", "3y", "5y"];
@@ -86,10 +87,10 @@ function EquityChart({ points }: { points: BacktestEquityPoint[] }) {
     );
 }
 
-function Metric({ label, value, tone, sub }: { label: string; value: string; tone?: string; sub?: string }) {
+function Metric({ label, value, tone, sub, info }: { label: string; value: string; tone?: string; sub?: string; info?: string }) {
     return (
         <div className="rounded-lg border border-gray-700/60 bg-gray-800/40 p-3">
-            <div className="text-xs text-gray-500">{label}</div>
+            <div className="flex items-center gap-1 text-xs text-gray-500">{label}{info && <InfoTooltip term={info} align="left" />}</div>
             <div className={`mt-1 text-lg font-bold ${tone ?? "text-gray-100"}`}>{value}</div>
             {sub && <div className="text-[11px] text-gray-500">{sub}</div>}
         </div>
@@ -240,12 +241,12 @@ export default function BacktestWorkspace() {
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
                         <Metric label="Strategy Return" value={fmtPct(m.totalReturnPct)} tone={toneFor(m.totalReturnPct)} sub={`vs ${fmtPct(m.buyHoldReturnPct)} hold`} />
                         <Metric label="Net P&L" value={`₹${m.pnl.toLocaleString("en-IN")}`} tone={toneFor(m.pnl)} sub={`₹${m.finalCapital.toLocaleString("en-IN")} final`} />
-                        <Metric label="CAGR" value={fmtPct(m.cagrPct)} tone={toneFor(m.cagrPct)} />
-                        <Metric label="Max Drawdown" value={fmtPct(m.maxDrawdownPct)} tone="text-red-400" />
-                        <Metric label="Sharpe" value={m.sharpe.toFixed(2)} tone={toneFor(m.sharpe)} />
-                        <Metric label="Sortino" value={m.sortino.toFixed(2)} tone={toneFor(m.sortino)} />
-                        <Metric label="Calmar" value={m.calmar.toFixed(2)} tone={toneFor(m.calmar)} />
-                        <Metric label="Profit Factor" value={m.profitFactor.toFixed(2)} tone={toneFor(m.profitFactor - 1)} />
+                        <Metric label="CAGR" value={fmtPct(m.cagrPct)} tone={toneFor(m.cagrPct)} info="cagr" />
+                        <Metric label="Max Drawdown" value={fmtPct(m.maxDrawdownPct)} tone="text-red-400" info="maxDrawdown" />
+                        <Metric label="Sharpe" value={m.sharpe.toFixed(2)} tone={toneFor(m.sharpe)} info="sharpe" />
+                        <Metric label="Sortino" value={m.sortino.toFixed(2)} tone={toneFor(m.sortino)} info="sortino" />
+                        <Metric label="Calmar" value={m.calmar.toFixed(2)} tone={toneFor(m.calmar)} info="calmar" />
+                        <Metric label="Profit Factor" value={m.profitFactor.toFixed(2)} tone={toneFor(m.profitFactor - 1)} info="profitFactor" />
                         <Metric label="Win Rate" value={`${m.winRatePct}%`} sub={`${m.trades} trades`} />
                         <Metric label="Avg Win / Loss" value={`${fmtPct(m.avgWinPct)} / ${fmtPct(m.avgLossPct)}`} />
                         <Metric label="Best / Worst" value={`${fmtPct(m.bestTradePct)} / ${fmtPct(m.worstTradePct)}`} />

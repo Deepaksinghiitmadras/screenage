@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import {Toaster} from "@/components/ui/sonner";
 import ThemeProvider from "@/components/ThemeProvider";
+import InstallPWA from "@/components/pwa/InstallPWA";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,6 +18,16 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Screenage",
   description: "Screenage is a stock market platform. Track real-time prices, set personalized alerts, and explore detailed company insights.",
+  applicationName: "Screenage",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Screenage" },
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0f14",
 };
 
 export default function RootLayout({
@@ -33,6 +44,7 @@ export default function RootLayout({
                 <ThemeProvider>
                     {children}
                     <Toaster/>
+                    <InstallPWA />
                 </ThemeProvider>
             </body>
         </html>

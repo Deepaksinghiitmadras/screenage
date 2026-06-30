@@ -99,6 +99,58 @@ declare global {
         candles: StockCandle[];
     };
 
+    type PortfolioHoldingInput = {
+        symbol: string;
+        company: string;
+        quantity: number;
+        avgPrice: number;
+        buyDate?: string | null;
+    };
+
+    type PortfolioHolding = {
+        symbol: string;
+        company: string;
+        sector: string;
+        quantity: number;
+        avgPrice: number;
+        buyDate: string | null;
+        price: number | null;
+        changePercent: number | null;
+        invested: number;
+        currentValue: number;
+        pnl: number;
+        pnlPct: number;
+        dayPnl: number;
+        weightPct: number;
+        available: boolean;
+    };
+
+    type PortfolioAllocationSlice = { label: string; value: number; pct: number };
+
+    type PortfolioRedFlag = { severity: 'high' | 'medium' | 'low'; label: string; detail: string };
+
+    type PortfolioSummary = {
+        invested: number;
+        currentValue: number;
+        totalPnl: number;
+        totalPnlPct: number;
+        dayPnl: number;
+        dayPnlPct: number;
+        annualizedPct: number | null;
+        diversificationScore: number;
+        holdings: number;
+    };
+
+    type PortfolioResult = {
+        available: boolean;
+        summary: PortfolioSummary;
+        holdings: PortfolioHolding[];
+        bySector: PortfolioAllocationSlice[];
+        byStock: PortfolioAllocationSlice[];
+        redFlags: PortfolioRedFlag[];
+        error?: string;
+    };
+
     type WatchlistQuote = {
         requested: string;
         symbol: string;
@@ -132,6 +184,18 @@ declare global {
         valuation?: string;
         whatToWatch?: string[];
         generatedAt?: string;
+        error?: string;
+    };
+
+    type CorporateEvent = {
+        symbol: string;
+        type: 'earnings' | 'ex_dividend';
+        date: string;
+    };
+
+    type CorporateActionsResult = {
+        events: CorporateEvent[];
+        available?: boolean;
         error?: string;
     };
 
@@ -242,6 +306,24 @@ declare global {
         error?: string;
     };
 
+    type FearGreedComponent = {
+        key: string;
+        label: string;
+        score: number;
+        value: string;
+        weight: number;
+    };
+
+    type FearGreedResult = {
+        composite: number;
+        label: string;
+        components: FearGreedComponent[];
+        nifty: number;
+        vix: number | null;
+        available?: boolean;
+        error?: string;
+    };
+
     type MarketRegimeConfig = { vixHigh: number; lookback: number };
 
     type MarketRegime = {
@@ -284,6 +366,31 @@ declare global {
         grade: string;            // A+ … D
         axes: ScorecardAxis[];
         error?: string;
+    };
+
+    type ComparisonAxis = { key: string; label: string; score: number | null };
+
+    type ComparisonMetrics = {
+        price: number | null;
+        marketCap: number | null;
+        trailingPE: number | null;
+        priceToBook: number | null;
+        roe: number | null;
+        profitMargin: number | null;
+        debtToEquity: number | null;
+        revenueGrowth: number | null;
+        beta: number | null;
+        dividendYield: number | null;
+    };
+
+    type ComparisonStock = {
+        symbol: string;
+        name: string;
+        available: boolean;
+        grade: string;
+        composite: number;
+        axes: ComparisonAxis[];
+        metrics: ComparisonMetrics;
     };
 
     type ForecastScenario = { price: number; returnPct: number };

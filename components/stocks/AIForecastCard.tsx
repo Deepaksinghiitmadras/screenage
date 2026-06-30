@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import { Sparkles, Loader2, Settings } from "lucide-react";
 import { getForecast } from "@/lib/actions/forecast.actions";
+import InfoTooltip from "@/components/InfoTooltip";
 
 const DEFAULT_CONFIG: ForecastConfig = { horizon: 30, lookback: 252, paths: 1000, ci: 80, driftMode: "balanced" };
 
@@ -145,6 +146,7 @@ export default function AIForecastCard({ symbol }: { symbol: string }) {
                     <Sparkles className="h-4 w-4 text-teal-400" />
                     <h3 className="text-base font-semibold text-gray-100">AI Price Forecast</h3>
                     <span className="rounded bg-gray-700/50 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-400">Monte Carlo</span>
+                    <InfoTooltip term="monteCarlo" />
                 </div>
                 <button
                     type="button"

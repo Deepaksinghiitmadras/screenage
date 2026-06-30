@@ -4,6 +4,20 @@ import { useEffect, useState } from "react";
 import { Activity, Loader2, TrendingUp, TrendingDown, Minus, Settings } from "lucide-react";
 import { getTechnicalSignals } from "@/lib/actions/technical.actions";
 import RegimeBadge from "@/components/RegimeBadge";
+import InfoTooltip from "@/components/InfoTooltip";
+
+function termForIndicator(label: string): string | undefined {
+    const l = label.toLowerCase();
+    if (l.startsWith("rsi")) return "rsi";
+    if (l.startsWith("macd")) return "macd";
+    if (l.startsWith("adx")) return "adx";
+    if (l.startsWith("atr")) return "atr";
+    if (l.startsWith("bollinger")) return "bollinger";
+    if (l.startsWith("stochastic")) return "stochastic";
+    if (l.startsWith("cci")) return "cci";
+    if (l.startsWith("williams")) return "williamsR";
+    return undefined;
+}
 
 const SIGNAL_DOT: Record<TechnicalSignalState, string> = {
     bull: "bg-green-500",
@@ -259,7 +273,7 @@ export default function TechnicalSignalCard({ symbol }: { symbol: string }) {
                                             <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${SIGNAL_DOT[ind.signal]}`} />
                                             <div className="min-w-0">
                                                 <div className="flex items-baseline justify-between gap-2">
-                                                    <span className="text-xs font-medium text-gray-300">{ind.label}</span>
+                                                <span className="flex items-center gap-1 text-xs font-medium text-gray-300">{ind.label}{termForIndicator(ind.label) && <InfoTooltip term={termForIndicator(ind.label)} align="left" />}</span>
                                                     <span className="text-xs tabular-nums text-gray-400">{ind.value}</span>
                                                 </div>
                                                 <p className="text-[11px] text-gray-500">{ind.note}</p>

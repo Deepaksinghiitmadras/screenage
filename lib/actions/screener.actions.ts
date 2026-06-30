@@ -38,6 +38,11 @@ async function fetchScreenerStocks(symbols: string[]): Promise<ScreenerStock[]> 
     }
 }
 
+/** Fundamentals for the whole curated universe (used by themed collections). */
+export async function getScreenerUniverse(): Promise<ScreenerStock[]> {
+    return fetchScreenerStocks(SCREENER_UNIVERSE);
+}
+
 // --- Peer comparison ---------------------------------------------------------
 
 export async function getPeerComparison(symbol: string): Promise<PeerComparison> {

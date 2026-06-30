@@ -9,6 +9,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Gauge, Loader2, Settings } from "lucide-react";
 import { getStockScorecard } from "@/lib/actions/scorecard.actions";
+import InfoTooltip from "@/components/InfoTooltip";
+
+const AXIS_INFO: Record<string, string> = {
+    trend: "Is the price in an uptrend? From moving-average alignment, ADX trend strength and multi-timeframe direction.",
+    momentum: "Short-term strength of the move — from RSI, MACD and momentum oscillators.",
+    value: "How cheaply the stock is priced — from P/E, P/B and PEG. Higher score = better value.",
+    quality: "Financial strength — return on equity, profit margins, debt and liquidity.",
+    growth: "How fast sales and profits are growing year-on-year.",
+    lowRisk: "Steadiness — lower beta and calmer volatility score higher (less risky).",
+};
 
 const SIZE = 280;
 const CX = SIZE / 2;
@@ -185,7 +195,7 @@ export default function StockScorecard({ symbol }: { symbol: string }) {
                         {data.axes.map((a) => (
                             <div key={a.key} className="rounded-md bg-black/20 p-2.5">
                                 <div className="flex items-baseline justify-between gap-2">
-                                    <span className="text-xs font-semibold text-gray-200">{a.label}</span>
+                                    <span className="flex items-center gap-1 text-xs font-semibold text-gray-200">{a.label}{AXIS_INFO[a.key] && <InfoTooltip text={AXIS_INFO[a.key]} align="left" />}</span>
                                     <span className={`text-sm font-bold tabular-nums ${scoreTone(a.score)}`}>{a.score ?? "—"}</span>
                                 </div>
                                 <p className="text-[11px] text-gray-500">{a.summary}</p>

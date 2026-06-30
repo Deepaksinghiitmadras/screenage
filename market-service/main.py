@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import logging
 import math
+import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from statistics import NormalDist
@@ -30,11 +32,15 @@ from curl_cffi import requests as curl_requests
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+import providers
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("market-service")
 
 # Browser-impersonating session so Yahoo Finance does not block requests.
-SESSION = curl_requests.Session(impersonate="chrome")
+# Routed through a proxy when MARKET_PROXY / MARKET_HTTP(S)_PROXY is set, which
+# is the universal fix for datacenter-IP throttling on Render.
+SESSION = providers.make_session()
 
 app = FastAPI(title="Screenage Market Data Service", version="0.1.0")
 
@@ -61,6 +67,8 @@ calendar_cache: TTLCache = TTLCache(maxsize=8, ttl=900)
 backtest_cache: TTLCache = TTLCache(maxsize=128, ttl=600)
 forecast_cache: TTLCache = TTLCache(maxsize=128, ttl=600)
 regime_cache: TTLCache = TTLCache(maxsize=16, ttl=300)
+fear_greed_cache: TTLCache = TTLCache(maxsize=8, ttl=300)
+corp_cache: TTLCache = TTLCache(maxsize=64, ttl=3600)
 
 # Underlyings that NSE classifies as index options (everything else is Equity).
 INDEX_OPTION_SYMBOLS: set[str] = {
@@ -160,7 +168,12 @@ NIFTY_50_META: dict[str, tuple[str, float]] = {
 
 
 def _quote_from_history(symbol: str) -> dict[str, Any] | None:
-    """Return a normalized quote dict for a Yahoo symbol, or None on failure."""
+    """Return a normalized quote dict for a symbol via the quotes provider chain."""
+    return providers.fetch_simple_quote_chain(symbol, _quote_from_history_yf)
+
+
+def _quote_from_history_yf(symbol: str) -> dict[str, Any] | None:
+    """yfinance single-quote from recent daily history, or None on failure."""
     try:
         df = yf.Ticker(symbol, session=SESSION).history(period="5d", interval="1d").dropna()
         if len(df) < 2:
@@ -184,8 +197,15 @@ def _quote_from_history(symbol: str) -> dict[str, Any] | None:
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "fundamentalsProviders": providers.get_fundamentals_providers(),
+        "quotesProviders": providers.get_quotes_providers(),
+        "historyProviders": providers.get_history_providers(),
+        "fmpEnabled": providers.fmp_enabled(),
+        "proxy": providers.proxy_status(),
+    }
 
 
 @app.get("/indices")
@@ -402,6 +422,176 @@ def market_regime(vix_high: float = 16.0, lookback: int = 30) -> dict[str, Any]:
     return payload
 
 
+def _clamp(v: float, lo: float = 0.0, hi: float = 100.0) -> float:
+    return max(lo, min(hi, v))
+
+
+@app.get("/fear-greed")
+def fear_greed() -> dict[str, Any]:
+    """Composite Fear & Greed index (0 = Extreme Fear, 100 = Extreme Greed) for
+    the Indian market, blended from NIFTY momentum, India VIX, market breadth,
+    NIFTY's 52-week position and the NIFTY put/call ratio. Each component is
+    normalized 0-100 with a default weight; the UI can re-weight client-side."""
+    cached = fear_greed_cache.get("fg")
+    if cached is not None:
+        return cached
+
+    try:
+        ndf = yf.Ticker("^NSEI", session=SESSION).history(period="1y", interval="1d").dropna()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("fear-greed NIFTY fetch failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Upstream data error") from exc
+    if ndf.empty or len(ndf) < 60:
+        raise HTTPException(status_code=502, detail="NIFTY history unavailable")
+
+    closes = ndf["Close"].to_numpy(dtype=float)
+    last = float(closes[-1])
+    sma125 = float(np.mean(closes[-125:])) if closes.size >= 125 else float(np.mean(closes))
+    hi52 = float(np.max(closes))
+    lo52 = float(np.min(closes))
+    ret20 = (last / float(closes[-21]) - 1) * 100 if closes.size >= 21 else 0.0
+
+    components: list[dict[str, Any]] = []
+
+    # 1) Momentum — NIFTY vs its 125-day average.
+    mom_pct = (last / sma125 - 1) * 100
+    components.append({
+        "key": "momentum", "label": "Momentum", "weight": 0.25,
+        "score": round(_clamp(50 + mom_pct * 5), 1),
+        "value": f"{mom_pct:+.1f}% vs 125-DMA",
+    })
+
+    # 2) Volatility — India VIX (low VIX = greed).
+    vix = None
+    try:
+        vdf = yf.Ticker("^INDIAVIX", session=SESSION).history(period="5d", interval="1d").dropna()
+        if not vdf.empty:
+            vix = round(float(vdf["Close"].iloc[-1]), 2)
+    except Exception:  # noqa: BLE001
+        vix = None
+    if vix is not None:
+        components.append({
+            "key": "volatility", "label": "Volatility", "weight": 0.2,
+            "score": round(_clamp((30 - vix) * 5), 1),
+            "value": f"India VIX {vix}",
+        })
+
+    # 3) Breadth — % of basket advancing today.
+    cells = get_heatmap().get("cells", [])
+    if cells:
+        adv = sum(1 for c in cells if c.get("changePercent", 0) > 0)
+        breadth = adv / len(cells) * 100
+        components.append({
+            "key": "breadth", "label": "Breadth", "weight": 0.2,
+            "score": round(_clamp(breadth), 1),
+            "value": f"{adv}/{len(cells)} advancing",
+        })
+
+    # 4) 52-week strength — NIFTY position in its 1-year range.
+    rng = hi52 - lo52
+    pos52 = (last - lo52) / rng * 100 if rng > 0 else 50
+    components.append({
+        "key": "strength", "label": "52-Week Strength", "weight": 0.2,
+        "score": round(_clamp(pos52), 1),
+        "value": f"{pos52:.0f}% of 52w range",
+    })
+
+    # 5) Put/Call ratio — NIFTY (low PCR = greed). Optional (NSE may be flaky).
+    try:
+        oc = option_chain("NIFTY")
+        pcr = oc.get("pcr")
+        if pcr:
+            components.append({
+                "key": "putcall", "label": "Put/Call Ratio", "weight": 0.15,
+                "score": round(_clamp(50 - (pcr - 1.0) * 100), 1),
+                "value": f"PCR {pcr}",
+            })
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Default (weighted) composite over available components.
+    w_sum = sum(c["weight"] for c in components)
+    composite = round(sum(c["score"] * c["weight"] for c in components) / w_sum, 1) if w_sum else 50.0
+
+    if composite < 25:
+        label = "Extreme Fear"
+    elif composite < 45:
+        label = "Fear"
+    elif composite < 55:
+        label = "Neutral"
+    elif composite < 75:
+        label = "Greed"
+    else:
+        label = "Extreme Greed"
+
+    payload = {
+        "composite": composite,
+        "label": label,
+        "components": components,
+        "nifty": round(last, 2),
+        "vix": vix,
+    }
+    fear_greed_cache["fg"] = payload
+    return payload
+
+
+@app.get("/corporate-actions")
+def corporate_actions(symbols: str = "") -> dict[str, Any]:
+    """Upcoming earnings dates and ex-dividend dates for a list of NSE symbols
+    (from yfinance per-ticker calendar). Returns events sorted by date. Only the
+    window [today-3d, today+150d] is kept. Research only."""
+    requested = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    if not requested:
+        return {"events": []}
+
+    cache_key = ",".join(sorted(requested))
+    cached = corp_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    today = datetime.now(timezone.utc).date()
+    lo = today - timedelta(days=3)
+    hi = today + timedelta(days=150)
+
+    def _to_date_str(value: Any) -> str | None:
+        if value is None:
+            return None
+        s = str(value)[:10]
+        try:
+            d = datetime.strptime(s, "%Y-%m-%d").date()
+        except ValueError:
+            return None
+        return s if lo <= d <= hi else None
+
+    def fetch(sym: str) -> list[dict[str, Any]]:
+        resolved = _resolve_symbol(sym)
+        try:
+            cal = yf.Ticker(resolved, session=SESSION).calendar
+        except Exception:  # noqa: BLE001
+            return []
+        if not cal or not isinstance(cal, dict):
+            return []
+        out: list[dict[str, Any]] = []
+        ed = cal.get("Earnings Date")
+        ed_val = ed[0] if isinstance(ed, list) and ed else (ed if not isinstance(ed, list) else None)
+        ed_str = _to_date_str(ed_val)
+        if ed_str:
+            out.append({"symbol": sym, "type": "earnings", "date": ed_str})
+        xd_str = _to_date_str(cal.get("Ex-Dividend Date"))
+        if xd_str:
+            out.append({"symbol": sym, "type": "ex_dividend", "date": xd_str})
+        return out
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        results = list(pool.map(fetch, requested))
+
+    events = [e for sub in results for e in sub]
+    events.sort(key=lambda e: e["date"])
+    payload = {"events": events}
+    corp_cache[cache_key] = payload
+    return payload
+
+
 # Symbols polled for the dashboard news feed (broad coverage across sectors).
 NEWS_BASKET: list[str] = [
     "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
@@ -588,19 +778,35 @@ def get_fundamentals(symbol: str) -> dict[str, Any]:
 
 
 def _fetch_fundamentals(symbol: str) -> dict[str, Any] | None:
-    """Cached fundamentals fetch. Returns the payload dict, or None on failure.
+    """Cached fundamentals fetch via the configured provider chain.
 
-    Shared by the /fundamentals endpoint and the /screener batch endpoint.
+    Tries each provider in FUNDAMENTALS_PROVIDERS order (e.g. "fmp,yfinance"),
+    returning the first success. Default chain is yfinance-only, so behaviour is
+    unchanged unless FMP is configured. Shared by /fundamentals and /screener.
     """
     resolved = _resolve_symbol(symbol)
     if resolved in fundamentals_cache:
         return fundamentals_cache[resolved]
 
-    try:
-        info = yf.Ticker(resolved, session=SESSION).get_info()
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("get_info failed for %s: %s", resolved, exc)
-        return None
+    payload = providers.fetch_fundamentals_chain(resolved, symbol, _fetch_fundamentals_yf)
+    if payload is not None:
+        fundamentals_cache[resolved] = payload
+    return payload
+
+
+def _fetch_fundamentals_yf(resolved: str, symbol: str) -> dict[str, Any] | None:
+    """yfinance fundamentals via get_info(). Yahoo throttles this hard from
+    datacenter IPs — retry once on failure."""
+    info = None
+    for attempt in range(2):
+        try:
+            info = yf.Ticker(resolved, session=SESSION).get_info()
+            if info and (info.get("regularMarketPrice") is not None or info.get("currentPrice") is not None):
+                break
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("get_info failed for %s (attempt %s): %s", resolved, attempt, exc)
+        if attempt == 0:
+            time.sleep(0.6)
 
     if not info or (info.get("regularMarketPrice") is None and info.get("currentPrice") is None):
         return None
@@ -665,9 +871,9 @@ def _fetch_fundamentals(symbol: str) -> dict[str, Any] | None:
             "targetLow": _num(info.get("targetLowPrice")),
             "numberOfAnalysts": _num(info.get("numberOfAnalystOpinions")),
         },
+        "_provider": "yfinance",
     }
 
-    fundamentals_cache[resolved] = payload
     return payload
 
 
@@ -699,16 +905,39 @@ def get_history(symbol: str, range: str = "6mo") -> dict[str, Any]:
     if cache_key in history_cache:
         return history_cache[cache_key]
 
+    max_points = _RANGE_MAX_POINTS.get(range, 132)
+
+    def _yf(sym: str) -> list[dict[str, Any]] | None:
+        return _history_yf(sym, period, interval)
+
+    candles = providers.fetch_history_chain(resolved, max_points, _yf)
+
+    if not candles:
+        raise HTTPException(status_code=404, detail=f"No history for {symbol}")
+
+    payload = {"symbol": resolved, "range": range, "candles": candles}
+    history_cache[cache_key] = payload
+    return payload
+
+
+# Approx trading-day counts per range, used to trim EOD-provider candles.
+_RANGE_MAX_POINTS: dict[str, int] = {
+    "1mo": 23, "3mo": 66, "6mo": 132, "1y": 252, "2y": 504, "5y": 260,
+}
+
+
+def _history_yf(resolved: str, period: str, interval: str) -> list[dict[str, Any]] | None:
+    """yfinance OHLC candles for a symbol, or None on failure/empty."""
     try:
         df = yf.Ticker(resolved, session=SESSION).history(
             period=period, interval=interval
         ).dropna()
     except Exception as exc:  # noqa: BLE001
         logger.warning("history failed for %s: %s", resolved, exc)
-        raise HTTPException(status_code=502, detail="Upstream data error") from exc
+        return None
 
     if df.empty:
-        raise HTTPException(status_code=404, detail=f"No history for {symbol}")
+        return None
 
     candles: list[dict[str, Any]] = []
     for idx, row in df.iterrows():
@@ -720,10 +949,7 @@ def get_history(symbol: str, range: str = "6mo") -> dict[str, Any]:
             "close": round(float(row["Close"]), 2),
             "volume": int(row["Volume"]) if not _is_nan(row["Volume"]) else 0,
         })
-
-    payload = {"symbol": resolved, "range": range, "candles": candles}
-    history_cache[cache_key] = payload
-    return payload
+    return candles
 
 
 def _is_nan(value: Any) -> bool:
@@ -751,45 +977,54 @@ def get_quotes(symbols: str = "") -> dict[str, Any]:
             results.append({**cached, "requested": raw})
             continue
 
-        try:
-            df = yf.Ticker(resolved, session=SESSION).history(
-                period="1y", interval="1d"
-            ).dropna()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("quote failed for %s: %s", resolved, exc)
-            df = None
-
-        if df is None or df.empty:
+        payload = providers.fetch_quote_chain(resolved, raw, _quote_one_yf)
+        if payload is None:
             results.append({"requested": raw, "symbol": resolved, "available": False})
             continue
 
-        closes = df["Close"].tolist()
-        last = df.iloc[-1]
-        price = round(float(last["Close"]), 2)
-        prev_close = round(float(df.iloc[-2]["Close"]), 2) if len(df) > 1 else price
-        change = round(price - prev_close, 2)
-        change_pct = round((change / prev_close) * 100, 2) if prev_close else 0.0
-        spark = [round(float(c), 2) for c in closes[-30:]]
-
-        payload = {
-            "symbol": resolved,
-            "available": True,
-            "price": price,
-            "open": round(float(last["Open"]), 2),
-            "dayHigh": round(float(last["High"]), 2),
-            "dayLow": round(float(last["Low"]), 2),
-            "previousClose": prev_close,
-            "change": change,
-            "changePercent": change_pct,
-            "volume": int(last["Volume"]) if not _is_nan(last["Volume"]) else 0,
-            "week52High": round(float(df["High"].max()), 2),
-            "week52Low": round(float(df["Low"].min()), 2),
-            "sparkline": spark,
-        }
         quotes_cache[resolved] = payload
         results.append({**payload, "requested": raw})
 
     return {"quotes": results}
+
+
+def _quote_one_yf(resolved: str, raw: str) -> dict[str, Any] | None:
+    """yfinance batch-quote payload for one symbol (price, day stats, 52w, spark)."""
+    try:
+        df = yf.Ticker(resolved, session=SESSION).history(
+            period="1y", interval="1d"
+        ).dropna()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("quote failed for %s: %s", resolved, exc)
+        return None
+
+    if df is None or df.empty:
+        return None
+
+    closes = df["Close"].tolist()
+    last = df.iloc[-1]
+    price = round(float(last["Close"]), 2)
+    prev_close = round(float(df.iloc[-2]["Close"]), 2) if len(df) > 1 else price
+    change = round(price - prev_close, 2)
+    change_pct = round((change / prev_close) * 100, 2) if prev_close else 0.0
+    spark = [round(float(c), 2) for c in closes[-30:]]
+
+    return {
+        "symbol": resolved,
+        "available": True,
+        "price": price,
+        "open": round(float(last["Open"]), 2),
+        "dayHigh": round(float(last["High"]), 2),
+        "dayLow": round(float(last["Low"]), 2),
+        "previousClose": prev_close,
+        "change": change,
+        "changePercent": change_pct,
+        "volume": int(last["Volume"]) if not _is_nan(last["Volume"]) else 0,
+        "week52High": round(float(df["High"].max()), 2),
+        "week52Low": round(float(df["Low"].min()), 2),
+        "sparkline": spark,
+        "_provider": "yfinance",
+    }
 
 
 @app.get("/screener")
@@ -809,7 +1044,9 @@ def screener(symbols: str = "") -> dict[str, Any]:
     if cached is not None:
         return cached
 
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    # Fewer workers = gentler on Yahoo's rate limiter (datacenter IPs get throttled).
+    workers = int(os.environ.get("SCREENER_WORKERS", "3"))
+    with ThreadPoolExecutor(max_workers=max(1, min(8, workers))) as pool:
         payloads = list(pool.map(_fetch_fundamentals, requested))
 
     stocks: list[dict[str, Any]] = []

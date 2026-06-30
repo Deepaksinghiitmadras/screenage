@@ -8,13 +8,21 @@ import { revalidatePath } from 'next/cache';
 export async function createAlert(params: {
     userId: string;
     symbol: string;
-    targetPrice: number;
+    kind?: 'PRICE' | 'PCT_CHANGE' | 'RSI';
+    targetPrice?: number;
+    threshold?: number;
     condition: 'ABOVE' | 'BELOW';
 }) {
     try {
         await connectToDatabase();
+        const kind = params.kind ?? 'PRICE';
         const newAlert = await Alert.create({
-            ...params,
+            userId: params.userId,
+            symbol: params.symbol,
+            kind,
+            condition: params.condition,
+            targetPrice: kind === 'PRICE' ? (params.targetPrice ?? 0) : 0,
+            threshold: kind === 'PRICE' ? 0 : (params.threshold ?? 0),
             active: true,
             // expiresAt handled by default value in schema
         });

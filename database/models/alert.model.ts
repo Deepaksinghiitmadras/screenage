@@ -1,10 +1,15 @@
 import { Schema, model, models, type Document, type Model } from 'mongoose';
 
+export type AlertKind = 'PRICE' | 'PCT_CHANGE' | 'RSI';
+export type AlertCondition = 'ABOVE' | 'BELOW';
+
 export interface IAlert extends Document {
     userId: string;
     symbol: string;
-    targetPrice: number;
-    condition: 'ABOVE' | 'BELOW';
+    kind: AlertKind;
+    targetPrice: number;     // used when kind === 'PRICE'
+    threshold: number;       // % move (PCT_CHANGE) or RSI level (RSI)
+    condition: AlertCondition;
     active: boolean;
     triggered: boolean;
     expiresAt: Date;
@@ -15,7 +20,9 @@ const AlertSchema = new Schema<IAlert>(
     {
         userId: { type: String, required: true, index: true },
         symbol: { type: String, required: true, uppercase: true, trim: true },
-        targetPrice: { type: Number, required: true },
+        kind: { type: String, enum: ['PRICE', 'PCT_CHANGE', 'RSI'], default: 'PRICE' },
+        targetPrice: { type: Number, default: 0 },
+        threshold: { type: Number, default: 0 },
         condition: { type: String, enum: ['ABOVE', 'BELOW'], required: true },
         active: { type: Boolean, default: true },
         triggered: { type: Boolean, default: false },

@@ -40,6 +40,15 @@ export default function AlertsPanel({ alerts, onRefresh }: AlertsPanelProps) {
                 ) : (
                     alerts.map((alert) => {
                         const isAbove = String(alert.condition).toLowerCase().includes("above");
+                        const kind = alert.kind ?? "PRICE";
+                        const subtitle =
+                            kind === "PRICE" ? `Target ${formatCurrency(alert.targetPrice)}`
+                            : kind === "PCT_CHANGE" ? `Daily move ${isAbove ? "+" : "-"}${alert.threshold}%`
+                            : `RSI ${isAbove ? "above" : "below"} ${alert.threshold}`;
+                        const badge =
+                            kind === "PRICE" ? `Price ${String(alert.condition).toLowerCase()} ${formatCurrency(alert.targetPrice)}`
+                            : kind === "PCT_CHANGE" ? `${isAbove ? "Gains" : "Falls"} more than ${alert.threshold}%`
+                            : `RSI ${isAbove ? "crosses above" : "crosses below"} ${alert.threshold}`;
                         return (
                             <div key={alert._id} className="group relative rounded-xl border border-gray-700 bg-gray-900/40 p-3 transition-colors hover:border-gray-600">
                                 <div className="flex justify-between items-start">
@@ -50,12 +59,12 @@ export default function AlertsPanel({ alerts, onRefresh }: AlertsPanelProps) {
                                             </div>
                                             <div>
                                                 <div className="text-sm font-bold text-gray-100">{alert.symbol}</div>
-                                                <div className="text-xs text-gray-500">Target {formatCurrency(alert.targetPrice)}</div>
+                                                <div className="text-xs text-gray-500">{subtitle}</div>
                                             </div>
                                         </div>
                                         <div className={`mt-2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ${isAbove ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
                                             <TrendingUp className={`h-3 w-3 ${isAbove ? "" : "rotate-180"}`} />
-                                            Price {String(alert.condition).toLowerCase()} {formatCurrency(alert.targetPrice)}
+                                            {badge}
                                         </div>
                                         <div className="mt-1 text-[10px] text-gray-600">
                                             Active until {new Date(new Date(alert.createdAt).getTime() + 90 * 24 * 60 * 60 * 1000).toLocaleDateString()}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Layers, Loader2, Search, TrendingUp, Target, Scale, RefreshCw, Shield, Ban } from "lucide-react";
+import InfoTooltip from "@/components/InfoTooltip";
 import { getOptionChain } from "@/lib/actions/options.actions";
 import { OIDistributionChart, IVSmileChart, MaxPainChart } from "@/components/options/OptionCharts";
 
@@ -33,7 +34,7 @@ function BuildupChip({ value }: { value?: OptionBuildup }) {
     );
 }
 
-function SummaryCard({ icon, label, value, sub, tone }: { icon: React.ReactNode; label: string; value: string; sub?: string; tone?: string }) {
+function SummaryCard({ icon, label, value, sub, tone }: { icon: React.ReactNode; label: React.ReactNode; value: string; sub?: string; tone?: string }) {
     return (
         <div className="rounded-lg border border-gray-700/60 bg-gray-800/40 p-3">
             <div className="flex items-center gap-1.5 text-xs text-gray-500">{icon}{label}</div>
@@ -178,8 +179,8 @@ export default function OptionsPage() {
                     {/* Summary */}
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
                         <SummaryCard icon={<TrendingUp className="h-3.5 w-3.5" />} label="Spot" value={data.underlying != null ? `₹${fmt(data.underlying)}` : "—"} sub={`ATM ${data.atmStrike ?? "—"}`} />
-                        <SummaryCard icon={<Scale className="h-3.5 w-3.5" />} label="PCR (OI)" value={fmt(data.pcr)} sub={data.pcr == null ? undefined : data.pcr >= 1 ? "Put-heavy" : "Call-heavy"} tone={pcrTone} />
-                        <SummaryCard icon={<Target className="h-3.5 w-3.5" />} label="Max Pain" value={data.maxPain != null ? `${data.maxPain}` : "—"} sub="expiry magnet" tone="text-amber-300" />
+                        <SummaryCard icon={<Scale className="h-3.5 w-3.5" />} label={<span className="inline-flex items-center gap-1">PCR (OI)<InfoTooltip term="pcr" /></span>} value={fmt(data.pcr)} sub={data.pcr == null ? undefined : data.pcr >= 1 ? "Put-heavy" : "Call-heavy"} tone={pcrTone} />
+                        <SummaryCard icon={<Target className="h-3.5 w-3.5" />} label={<span className="inline-flex items-center gap-1">Max Pain<InfoTooltip term="maxPain" /></span>} value={data.maxPain != null ? `${data.maxPain}` : "—"} sub="expiry magnet" tone="text-amber-300" />
                         <SummaryCard icon={<Layers className="h-3.5 w-3.5" />} label="Total Call OI" value={compact(data.totalCeOi)} tone="text-red-300" />
                         <SummaryCard icon={<Layers className="h-3.5 w-3.5" />} label="Total Put OI" value={compact(data.totalPeOi)} tone="text-green-300" />
                     </div>
@@ -245,8 +246,8 @@ export default function OptionsPage() {
                                         <tr className="border-b border-gray-700 text-[11px] uppercase tracking-wide text-gray-500">
                                             <th className="px-2 py-1.5 text-right font-medium">OI</th>
                                             <th className="px-2 py-1.5 text-right font-medium">Chg OI</th>
-                                            <th className="px-2 py-1.5 text-center font-medium">Bias</th>
-                                            <th className="px-2 py-1.5 text-right font-medium">IV</th>
+                                            <th className="px-2 py-1.5 text-center font-medium"><span className="inline-flex items-center gap-1">Bias<InfoTooltip term="oiBuildup" /></span></th>
+                                            <th className="px-2 py-1.5 text-right font-medium"><span className="inline-flex items-center gap-1">IV<InfoTooltip term="iv" align="right" /></span></th>
                                             <th className="px-2 py-1.5 text-right font-medium">LTP</th>
                                             <th className="px-2 py-1.5 text-center font-medium text-gray-300">Strike</th>
                                             <th className="px-2 py-1.5 text-right font-medium">LTP</th>
@@ -288,10 +289,10 @@ export default function OptionsPage() {
                                             <th colSpan={4} className="bg-green-500/5 py-1.5 text-center font-medium text-green-300">PUTS</th>
                                         </tr>
                                         <tr className="border-b border-gray-700 text-[11px] uppercase tracking-wide text-gray-500">
-                                            <th className="px-2 py-1.5 text-right font-medium">Delta</th>
-                                            <th className="px-2 py-1.5 text-right font-medium">Gamma</th>
-                                            <th className="px-2 py-1.5 text-right font-medium">Theta</th>
-                                            <th className="px-2 py-1.5 text-right font-medium">Vega</th>
+                                            <th className="px-2 py-1.5 text-right font-medium"><span className="inline-flex items-center gap-1">Delta<InfoTooltip term="delta" align="right" /></span></th>
+                                            <th className="px-2 py-1.5 text-right font-medium"><span className="inline-flex items-center gap-1">Gamma<InfoTooltip term="gamma" align="right" /></span></th>
+                                            <th className="px-2 py-1.5 text-right font-medium"><span className="inline-flex items-center gap-1">Theta<InfoTooltip term="theta" align="right" /></span></th>
+                                            <th className="px-2 py-1.5 text-right font-medium"><span className="inline-flex items-center gap-1">Vega<InfoTooltip term="vega" align="right" /></span></th>
                                             <th className="px-2 py-1.5 text-center font-medium text-gray-300">Strike</th>
                                             <th className="px-2 py-1.5 text-right font-medium">Delta</th>
                                             <th className="px-2 py-1.5 text-right font-medium">Gamma</th>

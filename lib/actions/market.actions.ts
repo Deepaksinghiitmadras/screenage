@@ -52,6 +52,22 @@ export async function getMarketRegime(config?: Partial<MarketRegimeConfig>): Pro
     return { ...data, available: data.regime !== 'Unknown' || data.universe > 0 };
 }
 
+export async function getFearGreed(): Promise<FearGreedResult> {
+    const fallback: FearGreedResult = {
+        composite: 50, label: 'Neutral', components: [], nifty: 0, vix: null, available: false,
+    };
+    const data = await fetchMarket<FearGreedResult>('/fear-greed', 300, fallback);
+    return { ...data, available: (data.components?.length ?? 0) > 0 };
+}
+
+export async function getCorporateActions(symbols: string[]): Promise<CorporateActionsResult> {
+    const list = symbols.map((s) => s.trim().toUpperCase()).filter(Boolean);
+    if (list.length === 0) return { events: [], available: true };
+    const param = encodeURIComponent(list.join(','));
+    const data = await fetchMarket<CorporateActionsResult>(`/corporate-actions?symbols=${param}`, 3600, { events: [] });
+    return { ...data, available: true };
+}
+
 
 export async function getMovers(): Promise<MarketMovers> {
     return fetchMarket<MarketMovers>(

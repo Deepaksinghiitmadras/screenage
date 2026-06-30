@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Settings, Activity } from "lucide-react";
 import { getMarketRegime } from "@/lib/actions/market.actions";
 import RegimeBadge from "@/components/RegimeBadge";
+import InfoTooltip from "@/components/InfoTooltip";
 
 const DEFAULT_CONFIG: MarketRegimeConfig = { vixHigh: 16, lookback: 30 };
 
@@ -51,7 +52,7 @@ export default function MarketRegimeBanner() {
                     <Activity className="h-5 w-5 text-teal-400" />
                     <div>
                         <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-gray-100">Market Regime</span>
+                            <span className="flex items-center gap-1 text-sm font-semibold text-gray-100">Market Regime<InfoTooltip term="regime" align="left" /></span>
                             {data?.available && <RegimeBadge regime={data.regime} size="md" />}
                         </div>
                         {data?.available && (

@@ -568,3 +568,22 @@ export async function getMarketScan(sector = 'All'): Promise<MarketScanResult> {
         return { available: false, sector, rows: [], error: 'Scan service is temporarily unavailable.' };
     }
 }
+
+/** Technical scan rows for an explicit symbol list (used by the alert checker). */
+export async function getTechnicalRows(symbols: string[]): Promise<MarketScanRow[]> {
+    const list = Array.from(new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean)));
+    if (list.length === 0) return [];
+    try {
+        const query = encodeURIComponent(list.join(','));
+        const res = await fetch(`${MARKET_SERVICE_URL}/technical-scan?symbols=${query}`, {
+            next: { revalidate: 300 },
+            signal: AbortSignal.timeout(30000),
+        });
+        if (!res.ok) return [];
+        const data = (await res.json()) as { rows: MarketScanRow[] };
+        return data.rows ?? [];
+    } catch (err) {
+        console.error('technical rows unreachable:', err);
+        return [];
+    }
+}

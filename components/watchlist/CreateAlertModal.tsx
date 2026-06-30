@@ -7,7 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createAlert } from "@/lib/actions/alert.actions";
+import InfoTooltip from "@/components/InfoTooltip";
 import { toast } from "sonner"; // Assuming sonner is available or use existing toast
+
+type AlertKind = "PRICE" | "PCT_CHANGE" | "RSI";
 
 interface CreateAlertModalProps {
     userId: string;
@@ -38,24 +41,32 @@ export default function CreateAlertModal({
     const setOpen = isControlled ? setControlledOpen : setInternalOpen;
 
     const [targetPrice, setTargetPrice] = useState<string>(currentPrice.toString());
+    const [kind, setKind] = useState<AlertKind>("PRICE");
     const [condition, setCondition] = useState<"ABOVE" | "BELOW">("ABOVE");
     const [alertName, setAlertName] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // Update target price when currentPrice changes (e.g. freshly fetched)
+    // Update target price when currentPrice changes (price alerts only)
     React.useEffect(() => {
-        setTargetPrice(currentPrice.toString());
-    }, [currentPrice]);
+        if (kind === "PRICE") setTargetPrice(currentPrice.toString());
+    }, [currentPrice, kind]);
+
+    const changeKind = (k: AlertKind) => {
+        setKind(k);
+        setTargetPrice(k === "PRICE" ? currentPrice.toString() : k === "RSI" ? "70" : "5");
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
+            const num = parseFloat(targetPrice);
             await createAlert({
                 userId,
                 symbol,
-                targetPrice: parseFloat(targetPrice),
+                kind,
                 condition,
+                ...(kind === "PRICE" ? { targetPrice: num } : { threshold: num }),
             });
             toast.success("Alert created successfully");
             setOpen?.(false);
@@ -77,7 +88,7 @@ export default function CreateAlertModal({
             )}
             <DialogContent className="sm:max-w-[425px] bg-[#0A0A0A] border-gray-800 text-white shadow-2xl">
                 <DialogHeader>
-                    <DialogTitle className="text-2xl font-bold tracking-tight text-white mb-2">Price Alert</DialogTitle>
+                    <DialogTitle className="text-2xl font-bold tracking-tight text-white mb-2">Create Alert</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-5 py-2 relative z-10">
 
@@ -106,13 +117,17 @@ export default function CreateAlertModal({
 
                     {/* Alert Type */}
                     <div className="grid gap-2">
-                        <Label className="text-gray-400 text-sm font-medium">Alert type</Label>
-                        <Select disabled defaultValue="price">
+                        <Label className="flex items-center gap-1 text-gray-400 text-sm font-medium">Alert type
+                            <InfoTooltip text="Price: alert when the price crosses a level. Daily % change: alert when the stock moves more than X% today. RSI: alert when momentum (RSI) crosses a level." />
+                        </Label>
+                        <Select value={kind} onValueChange={(val: any) => changeKind(val)}>
                             <SelectTrigger className="bg-[#1C1C1F] border-gray-800 text-gray-200">
                                 <SelectValue placeholder="Select type" />
                             </SelectTrigger>
                             <SelectContent className="bg-[#1C1C1F] border-gray-800 text-gray-200">
-                                <SelectItem value="price">Price</SelectItem>
+                                <SelectItem value="PRICE">Price</SelectItem>
+                                <SelectItem value="PCT_CHANGE">Daily % change</SelectItem>
+                                <SelectItem value="RSI">RSI level</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -125,24 +140,27 @@ export default function CreateAlertModal({
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="bg-[#1C1C1F] border-gray-800 text-gray-200">
-                                <SelectItem value="ABOVE">Greater than {">"}</SelectItem>
-                                <SelectItem value="BELOW">Less than {"<"}</SelectItem>
+                                <SelectItem value="ABOVE">{kind === "RSI" ? "Crosses above" : kind === "PCT_CHANGE" ? "Gains more than" : "Greater than >"}</SelectItem>
+                                <SelectItem value="BELOW">{kind === "RSI" ? "Crosses below" : kind === "PCT_CHANGE" ? "Falls more than" : "Less than <"}</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
 
                     {/* Threshold Value */}
                     <div className="grid gap-2">
-                        <Label className="text-gray-400 text-sm font-medium">Threshold value</Label>
+                        <Label className="text-gray-400 text-sm font-medium">
+                            {kind === "PRICE" ? "Target price" : kind === "PCT_CHANGE" ? "Daily move (%)" : "RSI level (0-100)"}
+                        </Label>
                         <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500 font-semibold">$</span>
+                            {kind === "PRICE" && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500 font-semibold">₹</span>}
+                            {kind === "PCT_CHANGE" && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-yellow-500 font-semibold">%</span>}
                             <Input
                                 type="number"
-                                step="0.01"
+                                step={kind === "PRICE" ? "0.01" : "1"}
                                 value={targetPrice}
                                 onChange={(e) => setTargetPrice(e.target.value)}
-                                placeholder="eg: 140"
-                                className="pl-7 bg-[#1C1C1F] border-gray-800 text-white placeholder:text-gray-600 focus:border-yellow-500 focus:ring-yellow-500/20 transition-all rounded-md h-10 font-mono"
+                                placeholder={kind === "PRICE" ? "eg: 1400" : kind === "PCT_CHANGE" ? "eg: 5" : "eg: 70"}
+                                className={`${kind === "PRICE" ? "pl-7" : ""} bg-[#1C1C1F] border-gray-800 text-white placeholder:text-gray-600 focus:border-yellow-500 focus:ring-yellow-500/20 transition-all rounded-md h-10 font-mono`}
                             />
                         </div>
                     </div>

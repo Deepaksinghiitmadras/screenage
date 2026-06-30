@@ -1,5 +1,6 @@
 import TradingViewWidget from "@/components/TradingViewWidget";
 import WatchlistButton from "@/components/WatchlistButton";
+import ShareToTelegramButton from "@/components/stocks/ShareToTelegramButton";
 import { Suspense } from "react";
 import StockSentimentCard from "@/components/stocks/StockSentimentCard";
 import HeadlineSentimentCard from "@/components/stocks/HeadlineSentimentCard";
@@ -81,6 +82,7 @@ export default async function StockDetails({ params }: StockDetailsPageProps) {
                         isInWatchlist={isInWatchlist}
                         userId={userId}
                     />
+                    <ShareToTelegramButton symbol={symbol} />
                 </div>
             </div>
 

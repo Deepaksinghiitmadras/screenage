@@ -6,6 +6,8 @@ import MarketOverviewNative from "@/components/market/MarketOverviewNative";
 import MarketHeatmap from "@/components/market/MarketHeatmap";
 import EconomicCalendar from "@/components/market/EconomicCalendar";
 import MarketRegimeBanner from "@/components/market/MarketRegimeBanner";
+import FearGreedGauge from "@/components/market/FearGreedGauge";
+import UpcomingEarnings from "@/components/market/UpcomingEarnings";
 import { getMovers, getHeatmap } from "@/lib/actions/market.actions";
 
 export const dynamic = "force-dynamic";
@@ -18,9 +20,10 @@ const Home = async () => {
             {/* Indices ticker strip */}
             <IndicesTicker />
 
-            {/* Overall market regime */}
-            <div className="mt-6 w-full">
+            {/* Overall market regime + sentiment */}
+            <div className="mt-6 grid w-full gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <MarketRegimeBanner />
+                <FearGreedGauge />
             </div>
 
             {/* Three-column layout: Market Overview (left) · movers + heatmap (center) · Latest News (right) */}
@@ -31,6 +34,9 @@ const Home = async () => {
 
                     {/* Economic calendar (native) */}
                     <EconomicCalendar title="Economic Calendar" height={520} />
+
+                    {/* Upcoming corporate earnings */}
+                    <UpcomingEarnings />
                 </aside>
 
                 {/* Center column: movers tables + heatmap */}

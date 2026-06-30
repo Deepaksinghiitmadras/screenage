@@ -1,9 +1,12 @@
 export const NAV_ITEMS = [
-    { href: '/', label: 'Dashboard' },
     { href: '/search', label: 'Search' },
     { href: '/screener', label: 'Screener' },
+    { href: '/collections', label: 'Collections' },
+    { href: '/compare', label: 'Compare' },
     { href: '/options', label: 'Options' },
     { href: '/backtest', label: 'Backtest' },
+    { href: '/events', label: 'Events' },
+    { href: '/portfolio', label: 'Portfolio' },
     { href: '/watchlist', label: 'Watchlist' },
 ];
 

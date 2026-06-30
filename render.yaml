@@ -13,3 +13,22 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.8
+      # --- Reliable data source (all optional; defaults to yfinance-only) ---
+      # Order of providers for company fundamentals; first success wins.
+      # Set to "fmp,yfinance" after adding FMP_API_KEY to prefer FMP.
+      - key: FUNDAMENTALS_PROVIDERS
+        value: yfinance
+      # Provider order for watchlist quotes and price-chart history (EOD).
+      # Set to "fmp,yfinance" for FMP-backed failover (uses FMP_API_KEY).
+      - key: QUOTES_PROVIDERS
+        value: yfinance
+      - key: HISTORY_PROVIDERS
+        value: yfinance
+      # Financial Modeling Prep API key (enables the "fmp" provider). Set in the
+      # Render dashboard (do not commit secrets).
+      - key: FMP_API_KEY
+        sync: false
+      # Optional proxy to bypass datacenter-IP throttling on Yahoo. Applies to
+      # ALL upstream requests. Set in the dashboard, e.g. http://user:pass@host:port
+      - key: MARKET_PROXY
+        sync: false
