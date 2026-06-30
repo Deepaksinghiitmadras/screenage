@@ -6,11 +6,13 @@
  */
 
 const MARKET_SERVICE_URL = process.env.MARKET_SERVICE_URL ?? 'http://127.0.0.1:8000';
+const FETCH_TIMEOUT_MS = Number(process.env.MARKET_FETCH_TIMEOUT_MS ?? 20000);
 
 async function fetchMarket<T>(path: string, revalidateSeconds: number, fallback: T): Promise<T> {
     try {
         const res = await fetch(`${MARKET_SERVICE_URL}${path}`, {
             next: { revalidate: revalidateSeconds },
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
         if (!res.ok) {
             console.error(`market-service ${path} failed: ${res.status}`);

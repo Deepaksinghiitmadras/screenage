@@ -40,6 +40,7 @@ export async function getForecast(symbol: string, config?: Partial<ForecastConfi
     try {
         const res = await fetch(`${MARKET_SERVICE_URL}/forecast?${params.toString()}`, {
             next: { revalidate: 600 },
+            signal: AbortSignal.timeout(30000),
         });
         if (!res.ok) {
             console.error('market-service /forecast failed:', res.status);

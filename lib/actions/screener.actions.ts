@@ -24,6 +24,7 @@ async function fetchScreenerStocks(symbols: string[]): Promise<ScreenerStock[]> 
     try {
         const res = await fetch(`${MARKET_SERVICE_URL}/screener?symbols=${query}`, {
             next: { revalidate: 600 },
+            signal: AbortSignal.timeout(30000),
         });
         if (!res.ok) {
             console.error('market-service /screener failed:', res.status);

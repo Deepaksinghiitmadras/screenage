@@ -555,6 +555,7 @@ export async function getMarketScan(sector = 'All'): Promise<MarketScanResult> {
         const query = encodeURIComponent(symbols.join(','));
         const res = await fetch(`${MARKET_SERVICE_URL}/technical-scan?symbols=${query}`, {
             next: { revalidate: 600 },
+            signal: AbortSignal.timeout(30000),
         });
         if (!res.ok) {
             return { available: false, sector, rows: [], error: 'Scan service is temporarily unavailable.' };

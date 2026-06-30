@@ -31,6 +31,7 @@ export async function getOptionChain(symbol: string, expiry?: string, strikesEac
     try {
         const res = await fetch(`${MARKET_SERVICE_URL}/option-chain?${params.toString()}`, {
             next: { revalidate: 120 },
+            signal: AbortSignal.timeout(25000),
         });
         if (!res.ok) {
             console.error('market-service /option-chain failed:', res.status);

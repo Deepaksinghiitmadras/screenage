@@ -65,6 +65,7 @@ export async function runBacktest(req: BacktestRequest): Promise<BacktestResult>
     try {
         const res = await fetch(`${MARKET_SERVICE_URL}/backtest?${params.toString()}`, {
             next: { revalidate: 600 },
+            signal: AbortSignal.timeout(30000),
         });
         if (!res.ok) {
             console.error('market-service /backtest failed:', res.status);

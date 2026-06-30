@@ -1,0 +1,25 @@
+name: Keep market-service warm
+
+# Render's free web service sleeps after ~15 min idle, causing a ~50s cold start
+# on the next request (the slow dashboard / empty stock pages). This pings the
+# health endpoint every ~10 min to keep it awake during the day.
+# Set the repo variable MARKET_SERVICE_URL (Settings → Secrets and variables →
+# Actions → Variables) to your Render URL, e.g. https://screenage-market-service.onrender.com
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          URL="${{ vars.MARKET_SERVICE_URL }}"
+          if [ -z "$URL" ]; then
+            URL="https://screenage-market-service.onrender.com"
+          fi
+          echo "Pinging $URL/health"
+          curl -fsS --max-time 60 "$URL/health" || echo "Service waking up (non-fatal)"
